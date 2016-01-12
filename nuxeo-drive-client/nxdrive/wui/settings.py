@@ -16,7 +16,7 @@ from nxdrive.client.base_automation_client import Unauthorized
 from nxdrive.client.base_automation_client import get_proxy_handler
 from nxdrive.client.base_automation_client import get_opener_proxies
 from nxdrive.engine.engine import RootAlreadyBindWithDifferentAccount
-from nxdrive.engine.engine import InvalidDriveException
+from nxdrive.engine.engine import InvalidDriveException, OSXAccountException, OSXInvalidLaunchLocationException
 from nxdrive.wui.translator import Translator
 from nxdrive.utils import DEVICE_DESCRIPTIONS
 from nxdrive.utils import TOKEN_PERMISSION
@@ -144,6 +144,10 @@ class WebSettingsApi(WebDriveApi):
             return "CONNECTION_ERROR"
         except urllib2.HTTPError as e:
             return "CONNECTION_ERROR"
+        except OSXAccountException:
+            return "Installed with different account"
+        except OSXInvalidLaunchLocationException:
+            return "Not launched from Application"
         except Exception as e:
             log.exception(e)
             # Map error here
