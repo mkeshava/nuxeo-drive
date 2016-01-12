@@ -730,6 +730,9 @@ class Engine(QObject):
         self.start()
 
     def bind(self, binder):
+        log.debug('getting into bind')
+        import traceback
+        traceback.print_stack()
         check_credential = True
         if hasattr(binder, 'no_check') and binder.no_check:
             check_credential = False
@@ -755,7 +758,7 @@ class Engine(QObject):
                 # log.error('4=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid))
                 # log.error('owner=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid).pw_name)
                 app_path = os.path.dirname(os.path.abspath(__file__))
-                if app_path.startswith('/Applications'):
+                if not app_path.startswith('/Applications'):
                     raise OSXInvalidLaunchLocationException()
                 app_index = app_path.find('.app')
                 log.debug('app_index=%s', app_index)
