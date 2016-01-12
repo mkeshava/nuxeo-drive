@@ -743,7 +743,7 @@ class Engine(QObject):
             log.error('working dir = %s', os.getcwd())
             from os import stat
             from pwd import getpwuid
-            log.error('owner=%s', getpwuid(stat(__file__).st_uid).pw_name)
+            log.error('owner=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid).pw_name)
             try:
                 if not os.path.exists(os.path.dirname(self._local_folder)):
                     log.debug('not found exception')
