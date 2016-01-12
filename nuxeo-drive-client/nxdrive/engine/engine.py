@@ -746,23 +746,26 @@ class Engine(QObject):
             log.debug('local_folder=%s', self._local_folder)
             log.error('current dir = %s', os.path.dirname(os.path.abspath(__file__)))
             log.error('working dir = %s', os.getcwd())
-            from os import stat
-            from pwd import getpwuid
-            log.error('1=%s', os.path.abspath(__file__))
-            log.error('2=%s', stat(os.path.abspath(__file__)))
-            log.error('3=%s', stat(os.path.abspath(__file__)).st_uid)
-            log.error('4=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid))
-            log.error('owner=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid).pw_name)
-            app_path = os.path.dirname(os.path.abspath(__file__))
-            if app_path.startswith('/Applications'):
-                raise OSXInvalidLaunchLocationException()
-            app_index = app_path.find('.app')
-            # if app_index != -1:
-            app_name = app_path[:app_index+4]
-            user = getpwuid(stat(app_name).st_uid).pw_name
-            log.debug('user from path=%s, user from id=%s', user, getpwuid(os.getuid()).pw_name)
-            if user != getpwuid(os.getuid()).pw_name:
-                raise OSXAccountException()
+            if AbstractOSIntegration.is_mac():
+                from os import stat
+                from pwd import getpwuid
+                log.error('1=%s', os.path.abspath(__file__))
+                # log.error('2=%s', stat(os.path.abspath(__file__)))
+                # log.error('3=%s', stat(os.path.abspath(__file__)).st_uid)
+                # log.error('4=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid))
+                # log.error('owner=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid).pw_name)
+                app_path = os.path.dirname(os.path.abspath(__file__))
+                if app_path.startswith('/Applications'):
+                    raise OSXInvalidLaunchLocationException()
+                app_index = app_path.find('.app')
+                log.debug('app_index=%s', app_index)
+                # if app_index != -1:
+                app_name = app_path[:app_index+4]
+                log.debug('app_name=%s', app_name)
+                user = getpwuid(stat(app_name).st_uid).pw_name
+                log.debug('user from path=%s, user from id=%s', user, getpwuid(os.getuid()).pw_name)
+                if user != getpwuid(os.getuid()).pw_name:
+                    raise OSXAccountException()
             try:
                 if not os.path.exists(os.path.dirname(self._local_folder)):
                     log.debug('not found exception')
