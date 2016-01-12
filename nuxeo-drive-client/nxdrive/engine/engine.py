@@ -739,6 +739,8 @@ class Engine(QObject):
         if check_fs:
             created_folder = False
             log.debug('local_folder=%s', self._local_folder)
+            log.error('current dir = %s', os.path.dirname(os.path.abspath(__file__)))
+            log.error('working dir = %s', os.getcwd())
             try:
                 if not os.path.exists(os.path.dirname(self._local_folder)):
                     log.debug('not found exception')
@@ -750,8 +752,6 @@ class Engine(QObject):
                 log.debug('trying to check fs')
                 self._check_fs(self._local_folder)
             except Exception as e:
-                log.error('current dir = %s', os.path.dirname(os.path.abspath(__file__)))
-                log.error('working dir = %s', os.getcwd())
                 log.debug('create folder is %s', created_folder)
                 try:
                     if created_folder:
