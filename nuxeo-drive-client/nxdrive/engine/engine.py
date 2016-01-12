@@ -738,16 +738,22 @@ class Engine(QObject):
         self._web_authentication = self._remote_token is not None
         if check_fs:
             created_folder = False
+            log.debug('local_folder=%s', self._local_folder)
             try:
                 if not os.path.exists(os.path.dirname(self._local_folder)):
+                    log.debug('not found exception')
                     raise NotFound()
                 if not os.path.exists(self._local_folder):
+                    log.debug('trying to make dir')
                     os.mkdir(self._local_folder)
                     created_folder = True
+                log.debug('trying to check fs')
                 self._check_fs(self._local_folder)
             except Exception as e:
+                log.debug('create folder is %s', created_folder)
                 try:
                     if created_folder:
+                        log.debug('trying to remove local folder')
                         os.rmdir(self._local_folder)
                 except:
                     pass

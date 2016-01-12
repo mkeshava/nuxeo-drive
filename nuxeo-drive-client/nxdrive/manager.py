@@ -886,6 +886,7 @@ class Manager(QtCore.QObject):
 
     def bind_engine(self, engine_type, local_folder, name, binder, starts=True):
         """Bind a local folder to a remote nuxeo server"""
+        log.debug('binder=%s', binder)
         if name is None and hasattr(binder, 'url'):
             name = self._get_engine_name(binder.url)
         if not self.check_local_folder_available(local_folder):
