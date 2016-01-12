@@ -731,8 +731,6 @@ class Engine(QObject):
 
     def bind(self, binder):
         log.debug('getting into bind')
-        import traceback
-        traceback.print_stack()
         check_credential = True
         if hasattr(binder, 'no_check') and binder.no_check:
             check_credential = False
