@@ -145,20 +145,25 @@ class DarwinIntegration(AbstractOSIntegration):
         to_delete = not os.path.exists(folder)
         try:
             if to_delete:
+                log.debug('to_delete')
                 os.mkdir(folder)
             if not os.access(folder, os.W_OK):
                 import stat
+                log.debug('chmod')
                 os.chmod(folder, stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP |
                                 stat.S_IRUSR | stat.S_IWGRP | stat.S_IWUSR)
             import xattr
             attr = "drive-test"
+            log.debug('set xattr')
             xattr.setxattr(folder, attr, attr)
             if xattr.getxattr(folder, attr) == attr:
                 result = True
+            log.debug('to remote xattr')
             xattr.removexattr(folder, attr)
         finally:
             try:
                 if to_delete:
+                    log.debug('rmdir')
                     os.rmdir(folder)
             except:
                 pass

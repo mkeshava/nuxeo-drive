@@ -787,10 +787,13 @@ class Engine(QObject):
 
     def _check_fs(self, path):
         if not self._manager.get_osi().is_partition_supported(path):
+            log.debug('invalid exception')
             raise InvalidDriveException()
         if os.path.exists(path):
             local_client = self.get_local_client()
+            log.debug('to get root id')
             root_id = local_client.get_root_id()
+            log.debug('root_id=%s', root_id)
             if root_id is not None:
                 # server_url|user|device_id|uid
                 token = root_id.split("|")
