@@ -743,6 +743,10 @@ class Engine(QObject):
             log.error('working dir = %s', os.getcwd())
             from os import stat
             from pwd import getpwuid
+            log.error('1=%s', os.path.abspath(__file__))
+            log.error('2=%s', stat(os.path.abspath(__file__)))
+            log.error('3=%s', stat(os.path.abspath(__file__)).st_uid)
+            log.error('4=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid))
             log.error('owner=%s', getpwuid(stat(os.path.abspath(__file__)).st_uid).pw_name)
             try:
                 if not os.path.exists(os.path.dirname(self._local_folder)):
