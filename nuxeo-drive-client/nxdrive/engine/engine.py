@@ -731,6 +731,8 @@ class Engine(QObject):
         check_fs = self._manager.is_checkfs()
         if hasattr(binder, 'no_fscheck') and binder.no_fscheck:
             check_fs = False
+        log.debug('nxdrive engine bind: check_credential=%s, check_fs=%s, password=%s, token=%s', check_credential, check_fs, binder.password, binder.token)
+        log.debug('nxdrive engine bind: remote_password=%s, remote_token=%s', self._remote_password, self._remote_token)
         self._server_url = self._normalize_url(binder.url)
         self._remote_user = binder.username
         self._remote_password = binder.password

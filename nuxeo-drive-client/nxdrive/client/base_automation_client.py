@@ -205,6 +205,7 @@ class BaseAutomationClient(BaseClient):
         self.user_id = user_id
         self.device_id = device_id
         self.client_version = client_version
+        log.debug('password=%s, token=%s', password, token)
         self._update_auth(password=password, token=token)
 
         self.cookie_jar = cookie_jar

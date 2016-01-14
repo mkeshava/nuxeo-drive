@@ -69,6 +69,7 @@ class RemoteDocumentClient(BaseAutomationClient):
                  ignored_prefixes=None, ignored_suffixes=None,
                  base_folder=None, timeout=20, blob_timeout=None,
                  cookie_jar=None, upload_tmp_dir=None, check_suspended=None):
+        log.debug('creating remote document client with password=%s, token=%s', password, token)
         super(RemoteDocumentClient, self).__init__(
             server_url, user_id, device_id, client_version,
             proxies=proxies, proxy_exceptions=proxy_exceptions,
