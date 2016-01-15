@@ -701,6 +701,8 @@ class Engine(QObject):
         self._dao.update_config("beta_update_url", beta_update_site_url)
 
     def update_password(self, password):
+        import traceback
+        traceback.print_stack()
         self._load_configuration()
         nxclient = self.remote_doc_client_factory(
             self._server_url, self._remote_user, self._manager.device_id,
@@ -732,7 +734,6 @@ class Engine(QObject):
         if hasattr(binder, 'no_fscheck') and binder.no_fscheck:
             check_fs = False
         log.debug('nxdrive engine bind: check_credential=%s, check_fs=%s, password=%s, token=%s', check_credential, check_fs, binder.password, binder.token)
-        log.debug('nxdrive engine bind: remote_password=%s, remote_token=%s', self._remote_password, self._remote_token)
         self._server_url = self._normalize_url(binder.url)
         self._remote_user = binder.username
         self._remote_password = binder.password
@@ -769,6 +770,7 @@ class Engine(QObject):
             # password in the DB
             self._remote_password = None
         # Save the configuration
+        log.debug('nxdrive engine bind: remote_password=%s, remote_token=%s', self._remote_password if self._remote_password else 'None', self._remote_token if self._remote_token else 'None')
         self._dao.update_config("web_authentication", self._web_authentication)
         self._dao.update_config("server_url", self._server_url)
         self._dao.update_config("remote_user", self._remote_user)

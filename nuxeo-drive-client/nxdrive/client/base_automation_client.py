@@ -677,6 +677,7 @@ class BaseAutomationClient(BaseClient):
         return list(self.cookie_jar) if self.cookie_jar is not None else []
 
     def _check_operation(self, command):
+        log.trace('operations=%s', self.operations)
         if command not in self.operations:
             if command.startswith('NuxeoDrive.'):
                 raise AddonNotInstalled(

@@ -344,8 +344,11 @@ class RemoteWatcher(EngineWorker):
                 return
             else:
                 paths = self._dao.get_paths_to_scan()
+                log.trace('paths=%s', paths)
                 while len(paths) > 0:
+                    log.trace('paths=%s', paths)
                     remote_ref = paths[0].path
+                    log.trace(' remote_ref=%s', remote_ref)
                     self._dao.update_config('remote_need_full_scan', remote_ref)
                     self._partial_full_scan(remote_ref)
                     paths = self._dao.get_paths_to_scan()

@@ -234,6 +234,7 @@ class WebDriveApi(QtCore.QObject):
 
     @QtCore.pyqtSlot(str, str, result=str)
     def update_password(self, uid, password):
+        log.debug('deprecated,  uid=%s, password=%s', uid, password)
         # Deprecated
         return self._update_password(uid, password)
 
@@ -248,9 +249,11 @@ class WebDriveApi(QtCore.QObject):
 
     @QtCore.pyqtSlot(str, str, result=QtCore.QObject)
     def update_password_async(self, uid, password):
+        log.debug('update_password_async with uid=%s, password=%s', uid, password)
         return Promise(self._update_password, uid, password)
 
     def _update_password(self, uid, password):
+        log.debug('update password 0=%s', password)
         password = str(password)
         try:
             from time import sleep
@@ -258,6 +261,7 @@ class WebDriveApi(QtCore.QObject):
             engine = self._get_engine(uid)
             if engine is None:
                 return ""
+            log.debug('update password 1=%s', password)
             engine.update_password(password)
             return ""
         except FolderAlreadyUsed:
