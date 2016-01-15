@@ -259,7 +259,7 @@ class BaseAutomationClient(BaseClient):
         log.trace("Calling %s with headers %r and cookies %r",
             url, headers, cookies)
         req = urllib2.Request(url, headers=headers)
-        log.debug('req = %s, url=%s ', req, url)
+        log.error('req = %s, url=%s ', req, url)
         try:
             response = json.loads(self.opener.open(
                 req, timeout=self.timeout).read())
