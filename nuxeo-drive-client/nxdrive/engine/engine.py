@@ -759,13 +759,13 @@ class Engine(QObject):
                     raise OSXInvalidLaunchLocationException()
                 app_index = app_path.find('.app')
                 log.debug('app_index=%s', app_index)
-                # if app_index != -1:
-                app_name = app_path[:app_index+4]
-                log.debug('app_name=%s', app_name)
-                user = getpwuid(stat(app_name).st_uid).pw_name
-                log.debug('user from path=%s, user from id=%s', user, getpwuid(os.getuid()).pw_name)
-                if user != getpwuid(os.getuid()).pw_name:
-                    raise OSXAccountException()
+                if app_index != -1:
+                    app_name = app_path[:app_index+4]
+                    log.debug('app_name=%s', app_name)
+                    user = getpwuid(stat(app_name).st_uid).pw_name
+                    log.debug('user from path=%s, user from id=%s', user, getpwuid(os.getuid()).pw_name)
+                    if user != getpwuid(os.getuid()).pw_name:
+                        raise OSXAccountException()
             try:
                 if not os.path.exists(os.path.dirname(self._local_folder)):
                     log.debug('not found exception')
