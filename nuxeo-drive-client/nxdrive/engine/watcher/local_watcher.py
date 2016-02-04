@@ -720,6 +720,7 @@ class LocalWatcher(EngineWorker):
         try:
             src_path = normalize_event_filename(evt.src_path)
             rel_path = self.client.get_path(src_path)
+            log.trace('rel_path=%s', rel_path)
             if len(rel_path) == 0 or rel_path == '/':
                 self.handle_watchdog_root_event(evt)
                 return
@@ -727,6 +728,7 @@ class LocalWatcher(EngineWorker):
             parent_path = os.path.dirname(src_path)
             parent_rel_path = self.client.get_path(parent_path)
             doc_pair = self._dao.get_state_from_local(rel_path)
+            log.trace('get_state_from_local: doc_pair from %s is %s', rel_path, doc_pair)
             # Dont care about ignored file, unless it is moved
             if (self.client.is_ignored(parent_rel_path, file_name) and evt.event_type != 'moved'):
                 return
@@ -761,6 +763,7 @@ class LocalWatcher(EngineWorker):
                     rel_parent_path = self.client.get_path(os.path.dirname(src_path))
                     if rel_parent_path == '':
                         rel_parent_path = '/'
+                    log.trace('local_info=%s, insert local state')
                     self._dao.insert_local_state(local_info, rel_parent_path)
                     # An event can be missed inside a new created folder as
                     # watchdog will put listener after it
@@ -791,6 +794,7 @@ class LocalWatcher(EngineWorker):
                     return
                 # This might be a move but Windows don't emit this event...
                 if local_info.remote_ref is not None:
+                    log.trace('checking why remote_ref is not none')
                     moved = False
                     from_pair = self._dao.get_normal_state_from_remote(local_info.remote_ref)
                     if from_pair is not None:
@@ -842,6 +846,7 @@ class LocalWatcher(EngineWorker):
                             # Stop the process here
                             return
                         log.debug('Copy paste from %r to %r', from_pair.local_path, rel_path)
+                log.trace('ok, at last stage, insert local state with local_info=%s, parent_rel_path=%s', local_info, parent_rel_path)
                 self._dao.insert_local_state(local_info, parent_rel_path)
                 # An event can be missed inside a new created folder as
                 # watchdog will put listener after it

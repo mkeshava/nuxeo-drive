@@ -33,6 +33,7 @@ class RemoteFilteredFileSystemClient(RemoteFileSystemClient):
         self._dao = dao
 
     def is_filtered(self, path):
+        log.trace('is_filtered called')
         return self._dao.is_filter(path)
 
     def get_children_info(self, fs_item_id):

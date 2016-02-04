@@ -620,11 +620,14 @@ class BaseAutomationClient(BaseClient):
     def wait(self):
         # Used for tests
         if self.is_elasticsearch_audit():
+            log.trace('wait: elasticsearch')
             self.execute("NuxeoDrive.WaitForElasticsearchCompletion")
         else:
+            log.trace('wait: not elasticsearch')
             # Backward compatibility with JPA audit implementation,
             # in which case we are also backward compatible with date based resolution
             if not self.is_event_log_id_available():
+                log.trace('wait: event log not avail')
                 time.sleep(AUDIT_CHANGE_FINDER_TIME_RESOLUTION)
             self.execute("NuxeoDrive.WaitForAsyncCompletion")
 

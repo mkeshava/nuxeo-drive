@@ -347,6 +347,7 @@ class Processor(EngineWorker):
         self._engine.get_queue_manager().push_error(doc_pair, exception=None)
 
     def _synchronize_locally_created(self, doc_pair, local_client, remote_client):
+        log.trace
         name = os.path.basename(doc_pair.local_path)
         if not doc_pair.folderish and is_office_temp_file(name) and doc_pair.error_count == 0:
             # Might be an Office temp file delay it by 60s
@@ -685,6 +686,7 @@ class Processor(EngineWorker):
                 "Could not find parent folder of doc %r (%r)"
                 " folder" % (name, doc_pair.remote_ref))
         if parent_pair.local_path is None:
+            log.trace('parent_pair.local_path is none, pair_state=%s', parent_pair.pair_state)
             if parent_pair.pair_state == 'unsynchronized':
                 self._dao.unsynchronize_state(doc_pair)
                 self._handle_unsynchronized(local_client, doc_pair)
@@ -696,12 +698,15 @@ class Processor(EngineWorker):
                 " folder" % (name, doc_pair.remote_ref))
         path = doc_pair.remote_parent_path + '/' + doc_pair.remote_ref
         if remote_client.is_filtered(path):
+            log.trace('remote client is filtered, return')
             # It is filtered so skip and remove from the LastKnownState
             self._dao.remove_state(doc_pair)
             return
         if not local_client.exists(doc_pair.local_path):
+            log.trace('local file does not exist, create')
             path = self._create_remotely(local_client, remote_client, doc_pair, parent_pair, name)
         else:
+            log.trace('local file exists')
             path = doc_pair.local_path
             remote_ref = local_client.get_remote_id(doc_pair.local_path)
             if remote_ref is not None and remote_ref == doc_pair.remote_ref:
@@ -712,11 +717,13 @@ class Processor(EngineWorker):
                 self._dao.set_conflict_state(doc_pair)
                 return
             elif remote_ref is not None:
+                log.trace('remote_ref exists, create')
                 # Case of several documents with same name or case insensitive hard drive
                 # TODO dedup
                 path = self._create_remotely(local_client, remote_client, doc_pair, parent_pair, name)
         local_client.set_remote_id(path, doc_pair.remote_ref)
         if path != doc_pair.local_path and doc_pair.folderish:
+            log.trace('update children')
             # Update childs
             self._dao.update_local_parent_path(doc_pair, os.path.basename(path), os.path.dirname(path))
         self._refresh_local_state(doc_pair, local_client.get_info(path))
@@ -725,6 +732,7 @@ class Processor(EngineWorker):
             log.debug("Pair is not in synchronized state (version issue): %r", doc_pair)
             # Need to check if this is a remote or local change
             new_pair = self._dao.get_state_from_id(doc_pair.id)
+            log.trace('new_pair=%s with local_state=%s, remote_state=%s', new_pair, new_pair.local_state, new_pair.remote_state)
             # Only local 'moved' change that can happen on a pair with processor
             if new_pair.local_state == 'moved':
                 self._synchronize_locally_moved(new_pair, local_client, remote_client, update=False)

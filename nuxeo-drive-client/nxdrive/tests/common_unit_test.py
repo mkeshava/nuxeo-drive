@@ -152,6 +152,7 @@ class UnitTestCase(unittest.TestCase):
         self.workspace_title_2 = self.workspace_title
 
     def tearDownServer(self, server_profile=None):
+        log.trace('teardown server')
         # Don't need to revoke tokens for the file system remote clients
         # since they use the same users as the remote document clients
         self.root_remote_client.execute("NuxeoDrive.TearDownIntegrationTests")
@@ -396,6 +397,7 @@ class UnitTestCase(unittest.TestCase):
         yappi.start()
 
     def teardown_profiler(self):
+        log.trace('teardown profiler')
         if not self.is_profiling():
             return
         path = os.environ["DRIVE_YAPPI"]
@@ -414,8 +416,11 @@ class UnitTestCase(unittest.TestCase):
         log.debug("Profiler Report generated in '%s'", report_path)
 
     def run(self, result=None):
+        log.trace('unittest run before teardown 1')
         self.app = TestQApplication([], self)
+        log.trace('unittest run before teardown 2')
         self.setUpApp()
+        log.trace('unittest run before teardown 3')
         self.result = result
 
         # TODO Should use a specific application
@@ -428,7 +433,9 @@ class UnitTestCase(unittest.TestCase):
             self.app.quit()
             log.debug("UnitTest thread finished")
 
+        log.trace('unittest run before teardown 4')
         sync_thread = Thread(target=launch_test)
+        log.trace('unittest run before teardown 5')
         sync_thread.start()
         self.app.exec_()
         sync_thread.join(30)
@@ -437,11 +444,13 @@ class UnitTestCase(unittest.TestCase):
         log.debug("UnitTest run finished")
 
     def tearDown(self):
+        log.trace('unittest testcase teardown')
         unittest.TestCase.tearDown(self)
         if not self.tearedDown:
             self.tearDownApp()
 
     def tearDownApp(self, server_profile=None):
+        log.trace(' teardown app')
         if self.tearedDown:
             return
         import sys

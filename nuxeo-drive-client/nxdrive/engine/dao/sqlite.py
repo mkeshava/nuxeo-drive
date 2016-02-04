@@ -651,6 +651,7 @@ class EngineDAO(ConfigurationDAO):
             self._lock.release()
 
     def insert_local_state(self, info, parent_path):
+        log.trace('insert_local_state')
         pair_state = PAIR_STATES.get(('created', 'unknown'))
         digest = info.get_digest()
         self._lock.acquire()
@@ -715,7 +716,7 @@ class EngineDAO(ConfigurationDAO):
                 log.trace("Emit newConflict with: %r: %r", row_id, pair)
                 self.newConflict.emit(row_id)
             else:
-                log.trace("Push to queue: %s: %r", pair_state, pair)
+                log.trace("Push to queue: %s [%d]: %r", pair_state, row_id, pair)
                 self._queue_manager.push_ref(row_id, folderish, pair_state)
         else:
             log.trace("Will not push pair: %s: %r", pair_state, pair)
@@ -980,6 +981,7 @@ class EngineDAO(ConfigurationDAO):
         return c.execute("SELECT * FROM States WHERE local_path=?", (path,)).fetchone()
 
     def insert_remote_state(self, info, remote_parent_path, local_path, local_parent_path):
+        log.trace('insert_remote_state')
         pair_state = PAIR_STATES.get(('unknown','created'))
         self._lock.acquire()
         try:
@@ -1309,14 +1311,20 @@ class EngineDAO(ConfigurationDAO):
         return c.execute("SELECT * FROM States WHERE remote_parent_ref=? AND remote_name < ? AND folderish=0 ORDER BY remote_name DESC LIMIT 1", (state.remote_parent_ref,state.remote_name)).fetchone()
 
     def is_filter(self, path):
+        log.trace('path=%s', path)
         path = self._clean_filter_path(path)
+        log.trace('cleaned path=%s', path)
+        log.trace('filters=%s', self._filters)
+        # log.trace('_filter=%s', self._filters)
         if any([path.startswith(filter_obj.path) for filter_obj in self._filters]):
+            log.trace(' well, start with it')
             return True
         else:
+            log.trace(' well, nothing here')
             return False
 
     def get_filters(self):
-        c = self._get_read_connection().cursor()
+        c = self._get_read_connection(factory=CustomRow).cursor()
         return c.execute("SELECT * FROM Filters").fetchall()
 
     def add_filter(self, path):

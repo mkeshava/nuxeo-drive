@@ -115,6 +115,7 @@ class RemoteFileSystemClient(BaseAutomationClient):
         return [self.file_to_info(fs_item) for fs_item in children]
 
     def is_filtered(self, path):
+        log.trace('is_filtered: simple false case')
         return False
 
     def make_folder(self, parent_id, name):

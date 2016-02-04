@@ -543,9 +543,12 @@ class RemoteWatcher(EngineWorker):
                 # Handle new document creations
                 created = False
                 parent_pairs = self._dao.get_states_from_remote(new_info.parent_uid)
+                log.trace('new_info=%s, parent_pairs=%s from %s', new_info, parent_pairs, new_info.parent_uid)
                 for parent_pair in parent_pairs:
+                    log.trace('parent_pair=%s', parent_pair)
 
                     child_pair, new_pair = (self._find_remote_child_match_or_create(parent_pair, new_info))
+                    log.trace('child_pair=%s, new_pair=%s', child_pair, new_pair)
                     if new_pair:
                         log.debug("Marked doc_pair '%s' as remote creation",
                                   child_pair.remote_name)
