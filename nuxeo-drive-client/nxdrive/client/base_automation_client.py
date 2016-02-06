@@ -42,15 +42,9 @@ AUDIT_CHANGE_FINDER_TIME_RESOLUTION = 1.0
 
 socket.setdefaulttimeout(DEFAULT_NUXEO_TX_TIMEOUT)
 
+
 class InvalidBatchException(Exception):
     pass
-
-
-class FakeException(Exception):
-    def __init__(self):
-        super(FakeException, self).__init__()
-        import cStringIO
-        self.fp = cStringIO.StringIO('{"error" : "Unable to find batch associated with id"}')
 
 
 def get_proxies_for_handler(proxy_settings):
@@ -424,7 +418,7 @@ class BaseAutomationClient(BaseClient):
                     # New upload API is not available, generate a batch id
                     batch_id = self._generate_unique_id()
                 upload_result = self.upload(batch_id, file_path, filename=filename,
-                                            mime_type=mime_type, fake_count=num_retries)
+                                            mime_type=mime_type)
                 upload_duration = int(time.time() - tick)
                 action.transfer_duration = upload_duration
                 # Use upload duration * 2 as Nuxeo transaction timeout
@@ -480,7 +474,7 @@ class BaseAutomationClient(BaseClient):
         return self._read_response(resp, url)
 
     def upload(self, batch_id, file_path, filename=None, file_index=0,
-               mime_type=None, fake_count=0):
+               mime_type=None):
         """Upload a file through an Automation batch
 
         Uses poster.httpstreaming to stream the upload
@@ -531,9 +525,6 @@ class BaseAutomationClient(BaseClient):
         req = urllib2.Request(url, data, headers)
         try:
             resp = self.streaming_opener.open(req, timeout=self.blob_timeout)
-            if fake_count == 0:
-                fake_count += 1
-                raise FakeException()
         except Exception as e:
             _, _, _, error = self._log_details(e)
             if error.startswith("Unable to find batch"):
