@@ -417,6 +417,8 @@ class NuxeoDriveSetup(object):
                             "packages": packages + [
                                 "nose",
                             ],
+                            "createLibraryZip": True,
+                            "appendScriptToExe": False
                         },
                         "rm_freeze_dir_after_zipping": False,
                     },
