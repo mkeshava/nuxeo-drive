@@ -994,7 +994,7 @@ class BaseAutomationClient(BaseClient):
                 if isinstance(e, urllib2.HTTPError):
                     return e.code, None, message, None
         # CSPII-9144: help diagnose upload problem
-        log.trace('Non-urllib2 exception: %s', e.message)
+        log.trace('Client exception: %s', e.message)
         return None
 
     def _generate_unique_id(self):
