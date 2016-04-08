@@ -196,11 +196,13 @@ class TokenBucket(object):
             self.rates.append(stats.rate)
             if len(self.rates) < TokenBucket.SMA_SIZE + 1:
                 # compute average
-                self.avg_rate += (stats.rate - self.avg_rate) / len(self.rates)
+                if self.rates:
+                    self.avg_rate += (stats.rate - self.avg_rate) / len(self.rates)
             else:
                 # compute a Simple Moving Average
-                self.avg_rate = self.avg_rate + (stats.rate - self.rates[0]) / TokenBucket.SMA_SIZE
-                self.rates.pop(0)
+                if self.rates:
+                    self.avg_rate = self.avg_rate + (stats.rate - self.rates[0]) / TokenBucket.SMA_SIZE
+                    self.rates.pop(0)
 
             return self.avg_rate
 
@@ -284,7 +286,7 @@ class FileTransferStats(object):
                     self.rates.pop(0)
 
         def get_percent_rate(self):
-            return 100. * self.size / self.total
+            return (100. * self.size / self.total) if self.total > 0 else None
 
         def __str__(self):
             return "filename %s, size/total %d/%d, rate %d" % (self.filename, self.size, self.total, self.rate)
