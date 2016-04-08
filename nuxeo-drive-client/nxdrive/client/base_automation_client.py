@@ -49,7 +49,6 @@ socket.setdefaulttimeout(DEFAULT_NUXEO_TX_TIMEOUT)
 
 
 class InvalidBatchException(Exception):
-    log.warning("Invalid batch exception")
     pass
 
 
