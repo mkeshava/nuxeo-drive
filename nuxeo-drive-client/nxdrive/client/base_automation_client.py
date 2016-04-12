@@ -274,15 +274,16 @@ class FileTransferStats(object):
                 now = time.time()
                 delta = now - self.last_update
                 self.last_update = now
-                rate = size / (delta * 1000.0)
-                self.rates.append(rate)
-                if len(self.rates) < FileTransferStats.Stats.SMA_SIZE + 1:
-                    # compute average
-                    self.rate += (rate - self.rate) / len(self.rates)
-                else:
-                    # compute a Simple Moving Average
-                    self.rate = self.rate + (rate - self.rates[0]) / TokenBucket.SMA_SIZE
-                    self.rates.pop(0)
+                if delta > 0:
+                    rate = size / (delta * 1000.0)
+                    self.rates.append(rate)
+                    if len(self.rates) < FileTransferStats.Stats.SMA_SIZE + 1:
+                        # compute average
+                        self.rate += (rate - self.rate) / len(self.rates)
+                    else:
+                        # compute a Simple Moving Average
+                        self.rate = self.rate + (rate - self.rates[0]) / TokenBucket.SMA_SIZE
+                        self.rates.pop(0)
 
         def get_percent_rate(self):
             return (100. * self.size / self.total) if self.total > 0 else None
