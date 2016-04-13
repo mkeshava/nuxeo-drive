@@ -612,6 +612,18 @@ class WebDriveApi(QtCore.QObject):
             return ""
 
     @QtCore.pyqtSlot(str, str, result=str)
+    def open_web_metadata_url(self, uid, path):
+        try:
+            engine = self._get_engine(uid)
+            if engine is None:
+                return "ERROR"
+            engine.open_web_metadata_url(path)
+        except Exception as e:
+            log.exception(e)
+            return ""
+
+
+    @QtCore.pyqtSlot(str, str, result=str)
     def open_local(self, uid, path):
         try:
             # Make sure we use unicode (comes from WebKit as QString)

@@ -56,6 +56,14 @@ class WebSystrayApi(WebDriveApi):
         except Exception as e:
             log.exception(e)
 
+    @QtCore.pyqtSlot(str, str)
+    def open_web_metadata_url(self, uid, ref):
+        try:
+            super(WebSystrayApi, self).open_web_metadata_url(uid, ref)
+            self._dialog.close()
+        except Exception as e:
+            log.exception(e)
+
     @QtCore.pyqtSlot(str, result=str)
     def open_remote(self, uid):
         try:
