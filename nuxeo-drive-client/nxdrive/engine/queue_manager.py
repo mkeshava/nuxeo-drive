@@ -163,15 +163,17 @@ class QueueManager(QObject):
         self.enable_remote_file_queue(False)
         self.enable_remote_folder_queue(False)
 
-    def restart(self, num_processors=None):
+    def restart(self, num_processors=None, wait=False):
         if num_processors is not None:
             assert sum(num_processors) <= MAX_NUMBER_PROCESSORS, \
                 'total number of additional processors must be %d or less' % MAX_NUMBER_PROCESSORS
+        self.shutdown_processors()
         for p in self._processors_pool:
-            p.worker.quit()
-        while self.is_active():
-            QCoreApplication.processEvents()
-            sleep(0.1)
+            p.worker.stop()
+        if wait:
+            while self.is_active():
+                QCoreApplication.processEvents()
+                sleep(0.1)
         self.set_max_processors(num_processors)
         self.launch_processors()
 
@@ -514,19 +516,19 @@ class QueueManager(QObject):
             self._processors_pool.append(self._create_thread(self._get_file, name="GenericProcessor"))
             count += 1
         if count > 0:
-            log.debug("creating %d additional file processor%s", count, 's' if self.count > 1 else '')
+            log.trace("creating %d additional file processor%s", count, 's' if count > 1 else '')
         count = 0
         while len([t for t in self._processors_pool if t.worker.get_name() == "RemoteFileProcessor"]) < self._max_remote_processors:
             self._processors_pool.append(self._create_thread(self._get_remote_file, name="RemoteFileProcessor"))
             count += 1
         if count > 0:
-            log.debug("creating %d additional remote file processor%s", count, 's' if count > 1 else '')
+            log.trace("creating %d additional remote file processor%s", count, 's' if count > 1 else '')
         count = 0
         while len([t for t in self._processors_pool if t.worker.get_name() == "LocalFileProcessor"]) < self._max_local_processors:
             self._processors_pool.append(self._create_thread(self._get_local_file, name="LocalFileProcessor"))
             count += 1
         if count > 0:
-            log.debug("creating %d additional local file processor%s", count, 's' if count > 1 else '')
+            log.trace("creating %d additional local file processor%s", count, 's' if count > 1 else '')
 
     @staticmethod
     def clear_client_transfer_stats(thread_id):

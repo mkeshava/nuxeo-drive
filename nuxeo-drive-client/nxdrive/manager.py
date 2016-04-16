@@ -214,10 +214,7 @@ class ConfigWatcher(object):
                     current_upload_rate = int(Manager.get()._dao.get_config('upload_rate', -1))
                 except ValueError:
                     current_upload_rate = 0
-                if new_upload_rate != current_upload_rate:
-                    BaseAutomationClient.set_upload_rate_limit(new_upload_rate)
-                    Manager.get()._dao.update_config('upload_rate', new_upload_rate)
-                    log.trace('update upload rate: %s', str(BaseAutomationClient.upload_token_bucket))
+
                 try:
                     new_download_rate = config.getint(ConfigParser.DEFAULTSECT, 'download-rate')
                 except ConfigParser.NoOptionError as e:
@@ -226,20 +223,39 @@ class ConfigWatcher(object):
                     current_download_rate = int(Manager.get()._dao.get_config('download_rate', -1))
                 except ValueError:
                     current_download_rate = 0
+
+                change =  not (new_upload_rate == current_upload_rate and new_download_rate == current_download_rate)
+                if not change:
+                    return
+
+                slower = new_upload_rate < current_upload_rate or new_download_rate < current_download_rate
+                if slower:
+                    # change processors first, then upadate the rate(s)
+                    self._change_processors(new_upload_rate, new_download_rate)
+
+                if new_upload_rate != current_upload_rate:
+                    BaseAutomationClient.set_upload_rate_limit(new_upload_rate)
+                    Manager.get()._dao.update_config('upload_rate', new_upload_rate)
+                    log.trace('update upload rate: %s', str(BaseAutomationClient.upload_token_bucket))
+
                 if new_download_rate != current_download_rate:
-                    size = BaseAutomationClient.get_download_buffer()
                     BaseAutomationClient.set_download_rate_limit(new_download_rate)
                     Manager.get()._dao.update_config('download_rate', new_download_rate)
                     log.trace('update download rate: %s', str(BaseAutomationClient.download_token_bucket))
-                if new_upload_rate != current_upload_rate or new_download_rate != current_download_rate:
-                    max_processors = get_number_of_processors(new_upload_rate, new_download_rate)
-                    for engine in Manager.get().get_engines().values():
-                        try:
-                            engine.get_queue_manager().restart(max_processors)
-                            log.trace('update engine %s processors: %d local, %d remote, %d generic',
-                                      engine.get_uid(), max_processors[0], max_processors[1], max_processors[2])
-                        except Exception as e:
-                            log.error('failed to update engine %s processors: %s', engine.get_uid(), str(e))
+
+                if change and new_upload_rate > current_upload_rate and new_download_rate > current_download_rate:
+                    # changed rate(s) first, then change processors
+                    self._change_processors(new_upload_rate, new_download_rate)
+
+        def _change_processors(self, upload_rate, download_rate):
+            max_processors = get_number_of_processors(upload_rate, download_rate)
+            for engine in Manager.get().get_engines().values():
+                try:
+                    engine.get_queue_manager().restart(max_processors)
+                    log.trace('update engine %s processors: %d local, %d remote, %d generic',
+                              engine.get_uid(), max_processors[0], max_processors[1], max_processors[2])
+                except Exception as e:
+                    log.error('failed to update engine %s processors: %s', engine.get_uid(), str(e))
 
     def __init__(self):
         self.watch = None

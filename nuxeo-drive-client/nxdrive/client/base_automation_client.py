@@ -334,11 +334,11 @@ class TokenBucket(object):
         # thread terminated, clean up other thread stats
         try:
             del self.wait_time[thread_id]
-        except IndexError:
+        except (IndexError, KeyError):
             pass
         try:
             del self.last_access_time[thread_id]
-        except IndexError:
+        except (IndexError, KeyError):
             pass
 
     def _reset(self):
@@ -481,7 +481,7 @@ class FileTransferStats(object):
             if token_bucket:
                 token_bucket.update_rate(self.stats[thread_id])
             del self.stats[thread_id]
-        except KeyError:
+        except (IndexError, KeyError):
             pass
 
     def _get_token_bucket(self):

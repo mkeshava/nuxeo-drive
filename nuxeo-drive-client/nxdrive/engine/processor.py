@@ -145,7 +145,7 @@ class Processor(EngineWorker):
         self._current_metrics = dict()
         self._current_item = self._get_item()
         soft_lock = None
-        while (self._continue and self._current_item != None):
+        while self._continue and self._current_item is not None:
             # Take client every time as it is cached in engine
             local_client = self._engine.get_local_client()
             remote_client = self._engine.get_remote_client()
@@ -252,6 +252,8 @@ class Processor(EngineWorker):
                 self._dao.release_state(self._thread_id)
             self._interact()
             self._current_item = self._get_item()
+        log.trace('%s processor terminated' if not self._continue else '%s processor finished, queue is empty',
+                  self.get_name())
 
     def _synchronize_conflicted(self, doc_pair, local_client, remote_client):
         # Auto-resolve conflict
