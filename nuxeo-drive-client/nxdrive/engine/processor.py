@@ -145,7 +145,7 @@ class Processor(EngineWorker):
         self._current_metrics = dict()
         self._current_item = self._get_item()
         soft_lock = None
-        while (self._current_item != None):
+        while (self._continue and self._current_item != None):
             # Take client every time as it is cached in engine
             local_client = self._engine.get_local_client()
             remote_client = self._engine.get_remote_client()

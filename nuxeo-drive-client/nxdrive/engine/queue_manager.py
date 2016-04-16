@@ -1,9 +1,11 @@
-from PyQt4.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer
+from PyQt4.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer, QCoreApplication
 from Queue import Queue, Empty
 from blacklist_queue import BlacklistItem, BlacklistQueue
 from nxdrive.client.base_automation_client import BaseAutomationClient
+from nxdrive.client.base_automation_client import get_number_of_processors, MAX_NUMBER_PROCESSORS
 from nxdrive.logging_config import get_logger
 from threading import Lock, local
+from time import sleep
 from copy import deepcopy
 
 log = get_logger(__name__)
@@ -45,7 +47,7 @@ class QueueManager(QObject):
     classdocs
     '''
 
-    def __init__(self, engine, dao, max_file_processors=5):
+    def __init__(self, engine, dao, max_file_processors=(0, 0, 5)):
         '''
         Constructor
         '''
@@ -67,6 +69,9 @@ class QueueManager(QObject):
         self._remote_file_thread = None
         self._error_threshold = ERROR_THRESHOLD
         self._error_interval = 60
+        self._max_local_processors = 0
+        self._max_remote_processors = 0
+        self._max_generic_processors = 0
         self.set_max_processors(max_file_processors)
         self._threads_pool = list()
         self._processors_pool = list()
@@ -122,9 +127,20 @@ class QueueManager(QObject):
         return result
 
     def set_max_processors(self, max_file_processors):
-        if max_file_processors < 2:
-            max_file_processors = 2
-        self._max_processors = max_file_processors - 2
+        max_local_processors = max_file_processors[0]
+        max_remote_processors = max_file_processors[1]
+        max_generic_processors = max_file_processors[2]
+        if max_local_processors < 1:
+            max_local_processors = 1
+        if max_remote_processors < 1:
+            max_remote_processors = 1
+        if max_generic_processors < 2:
+            max_generic_processors = 2
+        self._max_local_processors = max_local_processors - 1
+        self._max_remote_processors = max_remote_processors - 1
+        self._max_generic_processors = max_generic_processors - 2
+        log.trace('number of additional processors: %d local, %d remote, %d generic',
+                  self._max_local_processors, self._max_remote_processors, self._max_generic_processors)
 
     def resume(self):
         log.debug("Resuming queue")
@@ -146,6 +162,18 @@ class QueueManager(QObject):
         self.enable_local_folder_queue(False)
         self.enable_remote_file_queue(False)
         self.enable_remote_folder_queue(False)
+
+    def restart(self, num_processors=None):
+        if num_processors is not None:
+            assert sum(num_processors) <= MAX_NUMBER_PROCESSORS, \
+                'total number of additional processors must be %d or less' % MAX_NUMBER_PROCESSORS
+        for p in self._processors_pool:
+            p.worker.quit()
+        while self.is_active():
+            QCoreApplication.processEvents()
+            sleep(0.1)
+        self.set_max_processors(num_processors)
+        self.launch_processors()
 
     def enable_local_file_queue(self, value=True, emit=True):
         self._local_file_enable = value
@@ -475,9 +503,30 @@ class QueueManager(QObject):
             self._remote_file_thread = self._create_thread(self._get_remote_file, name="RemoteFileProcessor")
         if self._remote_file_queue.qsize() + self._local_file_queue.qsize() == 0:
             return
-        while len(self._processors_pool) < self._max_processors:
-            log.debug("creating additional file processor")
+
+        count = 0
+        log.trace('processor pool: %s', ','.join([t.worker.get_name() for t in self._processors_pool]))
+        log.trace('max generic processors: %d', self._max_generic_processors)
+        log.trace('max remote processors: %d', self._max_remote_processors)
+        log.trace('max local processors: %d', self._max_local_processors)
+
+        while len([t for t in self._processors_pool if t.worker.get_name() == "GenericProcessor"]) < self._max_generic_processors:
             self._processors_pool.append(self._create_thread(self._get_file, name="GenericProcessor"))
+            count += 1
+        if count > 0:
+            log.debug("creating %d additional file processor%s", count, 's' if self.count > 1 else '')
+        count = 0
+        while len([t for t in self._processors_pool if t.worker.get_name() == "RemoteFileProcessor"]) < self._max_remote_processors:
+            self._processors_pool.append(self._create_thread(self._get_remote_file, name="RemoteFileProcessor"))
+            count += 1
+        if count > 0:
+            log.debug("creating %d additional remote file processor%s", count, 's' if count > 1 else '')
+        count = 0
+        while len([t for t in self._processors_pool if t.worker.get_name() == "LocalFileProcessor"]) < self._max_local_processors:
+            self._processors_pool.append(self._create_thread(self._get_local_file, name="LocalFileProcessor"))
+            count += 1
+        if count > 0:
+            log.debug("creating %d additional local file processor%s", count, 's' if count > 1 else '')
 
     @staticmethod
     def clear_client_transfer_stats(thread_id):

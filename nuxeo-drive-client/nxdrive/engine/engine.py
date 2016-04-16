@@ -130,7 +130,7 @@ class Engine(QObject):
     offline = pyqtSignal()
     online = pyqtSignal()
 
-    def __init__(self, manager, definition, binder=None, processors=5,
+    def __init__(self, manager, definition, binder=None, processors=(0, 0, 12),
                  remote_watcher_delay=DEFAULT_REMOTE_WATCHER_DELAY,
                  remote_doc_client_factory=RemoteDocumentClient,
                  remote_fs_client_factory=RemoteFileSystemClient,
@@ -424,7 +424,7 @@ class Engine(QObject):
         from nxdrive.engine.queue_manager import QueueManager
         if self._manager.is_debug():
             return QueueManager(self, self._dao, max_file_processors=2)
-        return QueueManager(self, self._dao)
+        return QueueManager(self, self._dao, max_file_processors=processors)
 
     def _create_remote_watcher(self, delay):
         from nxdrive.engine.watcher.remote_watcher import RemoteWatcher
