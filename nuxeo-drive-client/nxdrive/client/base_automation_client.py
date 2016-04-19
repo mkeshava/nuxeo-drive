@@ -33,7 +33,8 @@ import threading
 import math
 from collections import defaultdict
 
-log = get_logger(__name__)
+
+log = None
 
 CHANGE_SUMMARY_OPERATION = 'NuxeoDrive.GetChangeSummary'
 DEFAULT_NUXEO_TX_TIMEOUT = 300
@@ -110,7 +111,8 @@ socket.setdefaulttimeout(DEFAULT_NUXEO_TX_TIMEOUT)
 
 
 class InvalidBatchException(Exception):
-    log.warning("Invalid batch exception")
+    if (log is not None):
+        log.warning("Invalid batch exception")
     pass
 
 
@@ -283,17 +285,16 @@ class TokenBucket(object):
         Compute a moving average of last SMA_SIZE file transfer rates or a simple average if not enough samples
         '''
         with self.lock:
-            if stats.avg_file_rate > 0:
-                self.rates.append(stats.avg_file_rate)
-                if len(self.rates) < TokenBucket.SMA_SIZE + 1:
-                    # compute average
-                    if self.rates:
-                        self.avg_rate += (stats.avg_file_rate - self.avg_rate) / len(self.rates)
-                else:
-                    # compute a Simple Moving Average
-                    if self.rates:
-                        self.avg_rate = self.avg_rate + (stats.avg_file_rate - self.rates[0]) / TokenBucket.SMA_SIZE
-                        self.rates.pop(0)
+            self.rates.append(stats.rate)
+            if len(self.rates) < TokenBucket.SMA_SIZE + 1:
+                # compute average
+                if self.rates:
+                    self.avg_rate += (stats.rate - self.avg_rate) / len(self.rates)
+            else:
+                # compute a Simple Moving Average
+                if self.rates:
+                    self.avg_rate = self.avg_rate + (stats.rate - self.rates[0]) / TokenBucket.SMA_SIZE
+                    self.rates.pop(0)
 
                 log.trace("%s average rate is %d", self.name, self.avg_rate)
 
@@ -567,7 +568,8 @@ class BaseAutomationClient(BaseClient):
                  ignored_prefixes=None, ignored_suffixes=None,
                  timeout=20, blob_timeout=60, cookie_jar=None,
                  upload_tmp_dir=None, check_suspended=None):
-
+        global log
+        log = get_logger(__name__)
         # Function to check during long-running processing like upload /
         # download if the synchronization thread needs to be suspended
         self.check_suspended = check_suspended
@@ -752,8 +754,12 @@ class BaseAutomationClient(BaseClient):
         try:
             resp = self.opener.open(req, timeout=timeout)
         except Exception as e:
-            self._log_details(e)
-            raise
+            log_details = self._log_details(e)
+            if isinstance(log_details, tuple):
+                _, _, _, error = log_details
+                if error and error.startswith("Unable to find batch"):
+                    raise InvalidBatchException()
+            raise e
         current_action = Action.get_current_action()
         if current_action and current_action.progress is None:
             current_action.progress = 0
