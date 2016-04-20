@@ -251,7 +251,7 @@ class ConfigWatcher(object):
                 ConfigWatcher.ConfigModifiedEventHandler.change_processors(new_upload_rate, new_download_rate)
 
         @staticmethod
-        def change_processors(self, upload_rate, download_rate):
+        def change_processors(upload_rate, download_rate):
             max_processors = get_number_of_processors(upload_rate, download_rate)
             for engine in Manager.get().get_engines().values():
                 try:
