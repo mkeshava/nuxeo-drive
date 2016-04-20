@@ -189,8 +189,6 @@ class ConfigWatcher(object):
         path = os.path.join(os.path.dirname(sys.executable), config_name)
         if os.path.exists(path):
             return path
-        if os.path.exists(config_name):
-            return config_name
         user_ini = os.path.expanduser(os.path.join(default_home, config_name))
         if os.path.exists(user_ini):
             return user_ini
@@ -270,9 +268,6 @@ class ConfigWatcher(object):
     def setup_watchdog(self):
         if not ConfigWatcher.config_ini:
             return
-
-        print("Watching modification on : %s", ConfigWatcher.config_ini)
-
         event_handler = ConfigWatcher.ConfigModifiedEventHandler()
         self.watch = self.observer.schedule(event_handler, os.path.dirname(ConfigWatcher.config_ini), recursive=False)
         self.observer.start()
