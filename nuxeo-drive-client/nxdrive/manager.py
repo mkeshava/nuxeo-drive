@@ -210,44 +210,50 @@ class ConfigWatcher(object):
                     new_upload_rate = config.getint(ConfigParser.DEFAULTSECT, 'upload-rate')
                 except ConfigParser.NoOptionError as e:
                     new_upload_rate = -1
-                try:
-                    current_upload_rate = int(Manager.get()._dao.get_config('upload_rate', -1))
-                except ValueError:
-                    current_upload_rate = 0
 
                 try:
                     new_download_rate = config.getint(ConfigParser.DEFAULTSECT, 'download-rate')
                 except ConfigParser.NoOptionError as e:
                     new_download_rate = -1
-                try:
-                    current_download_rate = int(Manager.get()._dao.get_config('download_rate', -1))
-                except ValueError:
-                    current_download_rate = 0
+                self.set_rate_limit_changed(new_upload_rate, new_download_rate)
 
-                change =  not (new_upload_rate == current_upload_rate and new_download_rate == current_download_rate)
-                if not change:
-                    return
+        @staticmethod
+        def set_rate_limit_changed(new_upload_rate, new_download_rate): 
+            try:
+                current_upload_rate = int(Manager.get()._dao.get_config('upload_rate', -1))
+            except ValueError:
+                current_upload_rate = 0
 
-                slower = new_upload_rate < current_upload_rate or new_download_rate < current_download_rate
-                if slower:
-                    # change processors first, then upadate the rate(s)
-                    self._change_processors(new_upload_rate, new_download_rate)
+            try:
+                current_download_rate = int(Manager.get()._dao.get_config('download_rate', -1))
+            except ValueError:
+                current_download_rate = 0
 
-                if new_upload_rate != current_upload_rate:
-                    BaseAutomationClient.set_upload_rate_limit(new_upload_rate)
-                    Manager.get()._dao.update_config('upload_rate', new_upload_rate)
-                    log.trace('update upload rate: %s', str(BaseAutomationClient.upload_token_bucket))
+            change = not (new_upload_rate == current_upload_rate and new_download_rate == current_download_rate)
+            if not change:
+                return
 
-                if new_download_rate != current_download_rate:
-                    BaseAutomationClient.set_download_rate_limit(new_download_rate)
-                    Manager.get()._dao.update_config('download_rate', new_download_rate)
-                    log.trace('update download rate: %s', str(BaseAutomationClient.download_token_bucket))
+            slower = new_upload_rate < current_upload_rate or new_download_rate < current_download_rate
+            if slower:
+                # change processors first, then upadate the rate(s)
+                ConfigWatcher.ConfigModifiedEventHandler.change_processors(new_upload_rate, new_download_rate)
 
-                if change and new_upload_rate > current_upload_rate and new_download_rate > current_download_rate:
-                    # changed rate(s) first, then change processors
-                    self._change_processors(new_upload_rate, new_download_rate)
+            if new_upload_rate != current_upload_rate:
+                BaseAutomationClient.set_upload_rate_limit(new_upload_rate)
+                Manager.get()._dao.update_config('upload_rate', new_upload_rate)
+                log.trace('update upload rate: %s', str(BaseAutomationClient.upload_token_bucket))
 
-        def _change_processors(self, upload_rate, download_rate):
+            if new_download_rate != current_download_rate:
+                BaseAutomationClient.set_download_rate_limit(new_download_rate)
+                Manager.get()._dao.update_config('download_rate', new_download_rate)
+                log.trace('update download rate: %s', str(BaseAutomationClient.download_token_bucket))
+
+            if change and new_upload_rate > current_upload_rate and new_download_rate > current_download_rate:
+                # changed rate(s) first, then change processors
+                ConfigWatcher.ConfigModifiedEventHandler.change_processors(new_upload_rate, new_download_rate)
+
+        @staticmethod
+        def change_processors(self, upload_rate, download_rate):
             max_processors = get_number_of_processors(upload_rate, download_rate)
             for engine in Manager.get().get_engines().values():
                 try:
