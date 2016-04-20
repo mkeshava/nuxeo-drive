@@ -113,7 +113,9 @@ socket.setdefaulttimeout(DEFAULT_NUXEO_TX_TIMEOUT)
 class InvalidBatchException(Exception):
     if (log is not None):
         log.warning("Invalid batch exception")
-    pass
+    
+    def __str__(self):
+        return "Invalid batch exception"
 
 
 def get_proxies_for_handler(proxy_settings):
@@ -205,6 +207,200 @@ class Unauthorized(Exception):
                 " the provided credentials" % (self.user_id, self.server_url))
 
 
+class TokenStrategy(object):
+    def begin(self, thread):
+        pass
+
+    def end(self, thread_id):
+        pass
+
+    def update(self, thread):
+        pass
+
+    def reset(self, thread):
+        pass
+
+    def is_next(self, thread):
+        return True
+
+    def get_count(self, thread):
+        return 0
+
+
+class NoStrategy(TokenStrategy):
+    def __init__(self, name):
+        self.name = name
+        self.wait_time = defaultdict(int)
+        self.last_access_time = defaultdict(object)
+
+    def begin(self, thread):
+        now = time.time()
+        if thread not in self.last_access_time:
+            self.last_access_time[thread] = (now, 0)
+            log.trace("[bucket '%s', thread %d]: +1(%d)", self.name, thread.ident, len(self.last_access_time))
+
+    def end(self, thread_id):
+        thread = filter(lambda x: x == thread_id, self.last_access_time.keys())
+        if not thread:
+            return
+
+        del self.last_access_time[thread[0]]
+        log.trace("[bucket '%s', thread %d]: -1(%d)", self.name, thread_id, len(self.last_access_time))
+        # thread terminated, clean up other thread stats
+        del self.wait_time[thread[0]]
+
+    def update(self, thread, ready=False):
+        # increment access count
+        self.last_access_time[thread] = (self.last_access_time[thread][0], self.last_access_time[thread][1]+1)
+        if ready:
+            now = time.time()
+            # update max wait time and reset access count
+            self.wait_time[thread] = max(self.wait_time[thread], now - self.last_access_time[thread][0])
+            self.last_access_time[thread] = (now, 0)
+            log.trace("[bucket '%s', thread %d]: max wait time was %3.2f",
+                      self.name, thread.ident, self.wait_time[thread])
+            if self.wait_time[thread] >= DM_READ_TIMEOUT:
+                log.warn("bucket '%s': thread %d waited more than %d (%3.2f)",
+                         self.name, thread.ident, DM_READ_TIMEOUT / 1000, self.wait_time[thread] / 1000.0)
+
+    def reset(self, thread):
+        if thread in self.last_access_time:
+            self.last_access_time[thread] = (time.time(), 0)
+            self.wait_time[thread] = 0
+
+    def get_count(self, thread):
+        try:
+            return self.last_access_time[thread][1]
+        except KeyError:
+            return 0
+
+
+class RoundRobinStrategy(TokenStrategy):
+    def __init__(self, name):
+        self.name = name
+        self.threads = list()
+        self.wait_time = defaultdict(int)
+        self.last_access_time = defaultdict(object)
+        self.round_robin = None
+        self.current = None
+
+    def begin(self, thread):
+        now = time.time()
+        if thread not in self.last_access_time:
+            self.last_access_time[thread] = (now, 0)
+        if thread not in self.threads:
+            self.threads.append(thread)
+            log.trace("[bucket '%s', thread %d]: +1(%d)", self.name, thread.ident, len(self.threads))
+            self.round_robin = itertools.cycle(self.threads)
+            self.current = self.round_robin.next()
+
+    def end(self, thread_id):
+        thread = filter(lambda x: x == thread_id, self.threads.keys())
+        if not thread:
+            return
+
+        del self.threads[thread[0]]
+        log.trace("[bucket '%s', thread %d]: -1(%d)", self.name, thread_id, len(self.threads))
+        if self.threads:
+            self.round_robin = itertools.cycle(self.threads)
+            self.current = self.round_robin.next()
+        else:
+            self.current = None
+        # thread terminated, clean up other thread stats
+        del self.wait_time[thread[0]]
+        del self.last_access_time[thread[0]]
+
+    def update(self, thread, ready=False):
+        self.current = self.round_robin.next()
+        # increment access count
+        self.last_access_time[thread] = (self.last_access_time[thread][0], self.last_access_time[thread][1]+1)
+        log.trace("[bucket '%s', thread %d]: next thread up: %d", self.name, thread.ident, self.current.ident)
+        if ready:
+            now = time.time()
+            # update max wait time and reset access count
+            self.wait_time[thread] = max(self.wait_time[thread], now - self.last_access_time[thread][0])
+            self.last_access_time[thread] = (now, 0)
+            log.trace("[bucket '%s', thread %d]: max wait time was %3.2f",
+                      self.name, thread.ident, self.wait_time[thread])
+            if self.wait_time[thread] >= DM_READ_TIMEOUT:
+                log.warn("bucket '%s': thread %d waited more than %d (%3.2f)",
+                         self.name, thread.ident, DM_READ_TIMEOUT / 1000, self.wait_time[thread] / 1000.0)
+
+    def reset(self, thread):
+        if thread in self.last_access_time:
+            self.last_access_time[thread] = (time.time(), 0)
+            self.wait_time[thread] = 0
+
+    def is_next(self, thread):
+        return thread == self.current
+
+    def get_count(self, thread):
+        try:
+            return self.last_access_time[thread][1]
+        except KeyError:
+            return 0
+
+
+class WaitPriorityStrategy(TokenStrategy):
+    def __init__(self, name):
+        self.name = name
+        self.last_access_time = dict()
+
+    def begin(self, thread):
+        if thread not in self.last_access_time:
+            log.trace("[bucket '%s', thread %d]: +1(%d)", self.name, thread.ident, len(self.last_access_time)+1)
+            self.last_access_time[thread] = (time.time(), 0)
+
+    def end(self, thread_id):
+        threads = filter(lambda x: x == thread_id, self.last_access_time.keys())
+        if threads:
+            del self.last_access_time[threads[0]]
+            log.trace("[bucket '%s', thread %d]: -1(%d)", self.name, threads[0].ident, len(self.last_access_time))
+
+    def update(self, thread, ready=False):
+        now = time.time()
+        wait_time = now - self.last_access_time[thread][0]
+        next_thread = self._get_max(now)
+        if self.last_access_time[next_thread][1] > MAX_NUMBER_PROCESSORS+1:
+            # thread was selected too many times
+            if not next_thread.isAlive():
+                del self.last_access_time[next_thread]
+
+        log.trace("[bucket '%s', thread %d]: next thread up: %d", self.name, thread.ident, next_thread.ident)
+        if ready:
+            self.last_access_time[thread] = (now, 0)
+            log.trace("[bucket '%s', thread %d]: max wait time was %3.2f", self.name, thread.ident, wait_time / 1000.0)
+            if wait_time >= DM_READ_TIMEOUT:
+                log.warn("bucket '%s': thread %d waited more than %d (%3.2f)",
+                         self.name, thread.ident, DM_READ_TIMEOUT / 1000, wait_time / 1000.0)
+
+    def reset(self, thread):
+        if thread in self.last_access_time:
+            self.last_access_time[thread] = (0, 0)
+
+    def is_next(self, thread):
+        now = time.time()
+        next_thread = self._get_max(now)
+        # increment selection counter
+        self.last_access_time[thread] = \
+            (self.last_access_time[thread][0], self.last_access_time[thread][1]+1)
+        return thread == next_thread
+
+    def _get_max(self, now):
+        max_wait = 0
+        max_thread = None
+        for thread, last_access in self.last_access_time.items():
+            if last_access[0] > 0 and now - last_access[0] > max_wait:
+                max_wait = now - last_access[0]
+                max_thread = thread
+        return max_thread
+
+    def get_count(self, thread):
+        try:
+            return self.last_access_time[thread][1]
+        except KeyError:
+            return 0
+
 class TokenBucket(object):
     """An implementation of the token bucket algorithm.
 
@@ -217,16 +413,12 @@ class TokenBucket(object):
 
     SMA_SIZE = 5  # moving average over the last 5 processors
 
-    def __init__(self, fill_rate, name=None):
+    def __init__(self, fill_rate, name=None, factory=TokenStrategy):
         """tokens is the total tokens in the bucket. fill_rate is the
         rate in tokens/second that the bucket will be refilled."""
         assert fill_rate > 0 or fill_rate == NO_LIMIT, 'fill rate must be greater than 0 or unlimited (-1)'
         self.name = name or 'unknown'
-        self.threads = list()
-        self.wait_time = defaultdict(int)
-        self.last_access_time = defaultdict(int)
-        self.round_robin = None
-        self.current = 0
+        self.strategy = factory(name)
         self.capacity = 0
         self._tokens = 0
         self.rates = []
@@ -250,33 +442,21 @@ class TokenBucket(object):
         with self.lock:
             existing_tokens = self._tokens
             available_tokens = min(tokens, self.tokens)
-            thread_id = threading.currentThread().ident
-            now = time.time()
-            if self.last_access_time[thread_id] == 0:
-                self.last_access_time[thread_id] = now
-            if not thread_id in self.threads:
-                self.threads.append(thread_id)
-                log.trace("[bucket '%s', thread %d]: +1(%d)", self.name, thread_id, len(self.threads))
-                self.round_robin = itertools.cycle(self.threads)
-                self.current = self.round_robin.next()
+            thread = threading.currentThread()
+            self.strategy.begin(thread)
             expected_time = (tokens - available_tokens) / self.fill_rate
-            if thread_id != self.current:
-                expected_time = max(expected_time, 1.0 / self.fill_rate, 0.001)
+            if not self.strategy.is_next(thread):
+                count = self.strategy.get_count(thread)
+                expected_time = max(expected_time, 1.0 * count / self.fill_rate, 0.001)
+
             if expected_time <= 0:
                 self._tokens -= available_tokens
-                self.wait_time[thread_id] = max(self.wait_time[thread_id], now - self.last_access_time[thread_id])
-                self.last_access_time[thread_id] = now
-                log.trace("[bucket '%s', thread %d]: max wait time was %3.2f",
-                          self.name, thread_id, self.wait_time[thread_id])
-                if self.wait_time[thread_id] >= DM_READ_TIMEOUT:
-                    log.warn("bucket '%s': thread %d waited more than %d (%3.2f)",
-                             self.name, thread_id, DM_READ_TIMEOUT / 1000, self.wait_time[thread_id] / 1000.0)
 
             # next thread up
-            self.current = self.round_robin.next()
-            log.trace("[bucket '%s', thread %d]: next thread up: %d", self.name, thread_id, self.current)
-            log.trace("[bucket '%s', thread '%d']: requested tokens: %d, existing: %d, available: %d, %swait%s",
-                      self.name, thread_id, tokens, existing_tokens, available_tokens,
+            self.strategy.update(thread, ready=expected_time <= 0)
+
+            log.trace("[bucket '%s', thread '%d']: requested tokens: %d, existing: %d, current available: %d, %swait%s",
+                      self.name, thread.ident, tokens, existing_tokens, available_tokens,
                       'no ' if expected_time <= 0 else '', ': ' + str(expected_time) + 's' if expected_time > 0 else '')
             return max(0, expected_time)
 
@@ -285,16 +465,17 @@ class TokenBucket(object):
         Compute a moving average of last SMA_SIZE file transfer rates or a simple average if not enough samples
         '''
         with self.lock:
-            self.rates.append(stats.rate)
-            if len(self.rates) < TokenBucket.SMA_SIZE + 1:
-                # compute average
-                if self.rates:
-                    self.avg_rate += (stats.rate - self.avg_rate) / len(self.rates)
-            else:
-                # compute a Simple Moving Average
-                if self.rates:
-                    self.avg_rate = self.avg_rate + (stats.rate - self.rates[0]) / TokenBucket.SMA_SIZE
-                    self.rates.pop(0)
+            if stats.avg_file_rate > 0:
+                self.rates.append(stats.avg_file_rate)
+                if len(self.rates) < TokenBucket.SMA_SIZE + 1:
+                    # compute average
+                    if self.rates:
+                        self.avg_rate += (stats.avg_file_rate - self.avg_rate) / len(self.rates)
+                else:
+                    # compute a Simple Moving Average
+                    if self.rates:
+                        self.avg_rate = self.avg_rate + (stats.avg_file_rate - self.rates[0]) / TokenBucket.SMA_SIZE
+                        self.rates.pop(0)
 
                 log.trace("%s average rate is %d", self.name, self.avg_rate)
 
@@ -321,31 +502,11 @@ class TokenBucket(object):
             return float(self.avg_rate)
 
     def clear(self, thread_id):
-        # thread terminated, reset the round robin
-        try:
-            del self.threads[thread_id]
-            log.trace("[bucket '%s', thread %d]: -1(%d)", self.name, thread_id, len(self.threads))
-            if self.threads:
-                self.round_robin = itertools.cycle(self.threads)
-                self.current = self.round_robin.next()
-            else:
-                self.current = 0
-        except IndexError:
-            pass
-        # thread terminated, clean up other thread stats
-        try:
-            del self.wait_time[thread_id]
-        except (IndexError, KeyError):
-            pass
-        try:
-            del self.last_access_time[thread_id]
-        except (IndexError, KeyError):
-            pass
+        # thread terminated, reset the strategy data
+        self.strategy.end(thread_id)
 
     def _reset(self):
-        thread_id = threading.currentThread().ident
-        if self.last_access_time.has_key(thread_id):
-            self.last_access_time[thread_id] = 0
+        self.strategy.reset(threading.currentThread())
 
     def __str__(self):
         with self.lock:
@@ -533,10 +694,12 @@ class BaseAutomationClient(BaseClient):
     @staticmethod
     def set_upload_rate_limit(bandwidth_limit):
         if bandwidth_limit == NO_LIMIT:
-            BaseAutomationClient.upload_token_bucket = TokenBucket(NO_LIMIT, name='upload')
+            BaseAutomationClient.upload_token_bucket = TokenBucket(NO_LIMIT, name='upload',
+                                                                   factory=WaitPriorityStrategy)
             BaseAutomationClient.upload_token_bucket._set_capacity(NO_LIMIT)
         else:
-            BaseAutomationClient.upload_token_bucket = TokenBucket(bandwidth_limit, name='upload')
+            BaseAutomationClient.upload_token_bucket = TokenBucket(bandwidth_limit, name='upload',
+                                                                   factory=WaitPriorityStrategy)
             buffer_size = BaseAutomationClient.get_upload_buffer()
             BaseAutomationClient.upload_token_bucket._set_capacity(1.1 * buffer_size / 1000)
 
@@ -547,10 +710,12 @@ class BaseAutomationClient(BaseClient):
     @staticmethod
     def set_download_rate_limit(bandwidth_limit):
         if bandwidth_limit == NO_LIMIT:
-            BaseAutomationClient.download_token_bucket = TokenBucket(NO_LIMIT, name='download')
+            BaseAutomationClient.download_token_bucket = TokenBucket(NO_LIMIT, name='download',
+                                                                     factory=NoStrategy)
             BaseAutomationClient.download_token_bucket._set_capacity(NO_LIMIT)
         else:
-            BaseAutomationClient.download_token_bucket = TokenBucket(bandwidth_limit, name='download')
+            BaseAutomationClient.download_token_bucket = TokenBucket(bandwidth_limit, name='download',
+                                                                     factory=NoStrategy)
             buffer_size = BaseAutomationClient.get_download_buffer()
             BaseAutomationClient.download_token_bucket._set_capacity(1.1 * buffer_size / 1000)
 
