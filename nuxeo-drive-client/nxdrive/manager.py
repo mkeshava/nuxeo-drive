@@ -327,6 +327,7 @@ class Manager(QtCore.QObject):
                 ssl._create_default_https_context = _create_unverified_https_context
         else:
             log.info("--consider-ssl-errors option is True, will verify HTTPS certificates")
+
         self._autolock_service = None
         self.nxdrive_home = os.path.expanduser(options.nxdrive_home)
         self.nxdrive_home = os.path.realpath(self.nxdrive_home)
@@ -371,6 +372,25 @@ class Manager(QtCore.QObject):
         self._dao.update_config("beta_update_url", options.beta_update_site_url)
         self.refresh_proxies()
         self._os = AbstractOSIntegration.get(self)
+
+        # setup the bandwidth rate limits
+        upload_rate = self._dao.get_config('upload_rate')
+        if upload_rate is None:
+            upload_rate = options.upload_rate
+        if upload_rate is None:
+            upload_rate = -1
+        BaseAutomationClient.set_upload_rate_limit(upload_rate)
+        log.debug('upload rate: %s', str(BaseAutomationClient.upload_token_bucket))
+
+        download_rate = self._dao.get_config('download_rate')
+        if download_rate is None:
+            download_rate = options.download_rate
+        if download_rate is None:
+            download_rate = -1
+        BaseAutomationClient.set_download_rate_limit(download_rate)
+        log.debug('download rate: %s', str(BaseAutomationClient.download_token_bucket))
+        self.config_watcher = ConfigWatcher()
+
         # Create DriveEdit
         self._create_autolock_service()
         self._create_drive_edit(options.protocol_url)
@@ -385,24 +405,6 @@ class Manager(QtCore.QObject):
         self.updated = False  # self.update_version()
         if self.device_id is None:
             self.generate_device_id()
-
-        # setup the bandwidth rate limits
-        upload_rate = options.upload_rate
-        if upload_rate is None:
-            upload_rate = self._dao.get_config('upload_rate', -1)
-        elif upload_rate != -1:
-            self._dao.update_config('upload_rate', upload_rate)
-        BaseAutomationClient.set_upload_rate_limit(upload_rate)
-        log.debug('upload rate: %s', str(BaseAutomationClient.upload_token_bucket))
-
-        download_rate = options.download_rate
-        if download_rate is None:
-            download_rate = self._dao.get_config('download_rate', -1)
-        elif download_rate != -1:
-            self._dao.update_config('download_rate', download_rate)
-        BaseAutomationClient.set_download_rate_limit(download_rate)
-        self.config_watcher = ConfigWatcher()
-        log.debug('download rate: %s', str(BaseAutomationClient.download_token_bucket))
 
         self.load()
 
