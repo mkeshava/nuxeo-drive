@@ -374,19 +374,11 @@ class Manager(QtCore.QObject):
         self._os = AbstractOSIntegration.get(self)
 
         # setup the bandwidth rate limits
-        upload_rate = self._dao.get_config('upload_rate')
-        if upload_rate is None:
-            upload_rate = options.upload_rate
-        if upload_rate is None:
-            upload_rate = -1
+        upload_rate = self._dao.get_config('upload_rate') or options.upload_rate or -1
         BaseAutomationClient.set_upload_rate_limit(upload_rate)
         log.debug('upload rate: %s', str(BaseAutomationClient.upload_token_bucket))
 
-        download_rate = self._dao.get_config('download_rate')
-        if download_rate is None:
-            download_rate = options.download_rate
-        if download_rate is None:
-            download_rate = -1
+        download_rate = self._dao.get_config('download_rate') or options.download_rate or -1
         BaseAutomationClient.set_download_rate_limit(download_rate)
         log.debug('download rate: %s', str(BaseAutomationClient.download_token_bucket))
         self.config_watcher = ConfigWatcher()
