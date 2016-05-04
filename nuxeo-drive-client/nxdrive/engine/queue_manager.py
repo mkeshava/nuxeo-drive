@@ -167,7 +167,17 @@ class QueueManager(QObject):
         if num_processors is not None:
             assert sum(num_processors) <= MAX_NUMBER_PROCESSORS, \
                 'total number of additional processors must be %d or less' % MAX_NUMBER_PROCESSORS
+        # stop new items from being processed
         self.shutdown_processors()
+        # attempt to stop current processors
+        if self._local_file_thread is not None:
+            self._local_file_thread.worker.stop()
+        if self._local_folder_thread is not None:
+            self._local_folder_thread.worker.stop()
+        if self._remote_file_thread is not None:
+            self._remote_file_thread.worker.stop()
+        if self._remote_folder_thread is not None:
+            self._remote_folder_thread.worker.stop()
         for p in self._processors_pool:
             p.worker.stop()
         if wait:
@@ -175,6 +185,9 @@ class QueueManager(QObject):
                 QCoreApplication.processEvents()
                 sleep(0.1)
         self.set_max_processors(num_processors)
+        # re-enable new items to trigger processing
+        self.init_processors()
+        # launch processors for new items in the queue, if any
         self.launch_processors()
 
     def enable_local_file_queue(self, value=True, emit=True):
