@@ -492,7 +492,7 @@ class QueueManager(QObject):
             return
 
         log.trace("Launching processors")
-        if not (self._local_folder_queue.empty() or self._local_file_queue.empty()):
+        if not (self._local_folder_queue.empty() and self._local_file_queue.empty()):
             if self._local_folder_thread is None and not self._local_folder_queue.empty() and self._local_folder_enable:
                 log.debug("creating local folder processor")
                 self._local_folder_thread = self._create_thread(self._get_local_folder, name="LocalFolderProcessor")
@@ -500,7 +500,7 @@ class QueueManager(QObject):
                 log.debug("creating local file processor")
                 self._local_file_thread = self._create_thread(self._get_local_file, name="LocalFileProcessor")
 
-        if not (self._remote_folder_queue.empty() or self._remote_file_queue.empty()):
+        if not (self._remote_folder_queue.empty() and self._remote_file_queue.empty()):
             if self._remote_folder_thread is None and not self._remote_folder_queue.empty() and self._remote_folder_enable:
                 log.debug("creating remote folder processor")
                 self._remote_folder_thread = self._create_thread(self._get_remote_folder, name="RemoteFolderProcessor")
