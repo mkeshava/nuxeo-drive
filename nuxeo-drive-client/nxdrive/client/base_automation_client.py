@@ -1451,7 +1451,8 @@ class BaseAutomationClient(BaseClient):
 
     def _read_data(self, file_object, buffer_size):
         total_size = os.fstat(file_object.fileno()).st_size
-        filename = os.path.basename(file_object.name)
+        filename = file_object.name.encode('utf-8')
+        filename = os.path.basename(filename)
         self.update_upload_transfer_rate(-1, total_size=total_size, filename=filename)
 
         while True:
