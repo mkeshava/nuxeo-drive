@@ -1093,18 +1093,27 @@ class BaseAutomationClient(BaseClient):
                       ' with file %s', tx_timeout, DEFAULT_NUXEO_TX_TIMEOUT,
                       upload_duration, command, file_path)
             if upload_duration > 0:
-                log.trace("Speed for %d o is %d s : %f o/s", os.stat(file_path).st_size, upload_duration,
+                log.trace("Speed for %d octets in %d sec : %f o/s", os.stat(file_path).st_size, upload_duration,
                           os.stat(file_path).st_size / upload_duration)
-            # NXDRIVE-433: Compat with 7.4 intermediate state
-            if upload_result.get('uploaded') is None:
-                self.new_upload_api_available = False
-            if upload_result.get('batchId') is not None:
-                result = self.execute_batch(command, batch_id, '0', tx_timeout,
-                                            **params)
-                return result
-            else:
-                raise ValueError("Bad response from batch upload with id '%s'"
-                                 " and file path '%s'" % (batch_id, file_path))
+            # upload result may be "empty"
+            error_msg = "Bad response from batch upload with id '%s'"\
+                        " and file path '%s'" % (batch_id, file_path)
+            try:
+                # NXDRIVE-433: Compat with 7.4 intermediate state
+                if upload_result.get('uploaded') is None:
+                    self.new_upload_api_available = False
+                if upload_result.get('batchId') is not None:
+                    result = self.execute_batch(command, batch_id, '0', tx_timeout,
+                                                **params)
+                    return result
+                else:
+                    raise ValueError(error_msg)
+            except (AttributeError, TypeError) as e:
+                log.debug("invalid response format: %s (%s)", str(upload_result), str(e))
+                raise ValueError(error_msg)
+            except KeyError as e:
+                log.debug("invalid response content: %s (%s)", str(upload_result), str(e))
+                raise ValueError(error_msg)
         except InvalidBatchException:
             self.cookie_jar.clear_session_cookies()
         finally:
