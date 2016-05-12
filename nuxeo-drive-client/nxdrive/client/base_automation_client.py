@@ -1486,7 +1486,6 @@ class BaseAutomationClient(BaseClient):
         log.trace('Downloading file from %r to %r with digest=%s, digest_algorithm=%s', url, file_out, digest,
                   digest_algorithm)
         h = None
-        error = None
         if digest is not None:
             if digest_algorithm is None:
                 digest_algorithm = guess_digest_algorithm(digest)
@@ -1514,7 +1513,8 @@ class BaseAutomationClient(BaseClient):
                 current_action.size = total_size
 
             if file_out is not None:
-                filename = os.path.basename(file_out)
+                # filename = os.path.basename(file_out)
+                filename = os.path.basename(file_out.encode('utf-8'))
                 locker = self.unlock_path(file_out)
                 try:
                     with open(file_out, "wb") as f:
