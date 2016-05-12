@@ -91,6 +91,12 @@ class AutoRetryCursor(sqlite3.Cursor):
                 log.trace('Retry locked database #%d', count)
                 if count > 5:
                     raise e
+            except sqlite3.DatabaseError as e:
+                log.trace('compact the database database')
+                self.connection.rollback()
+                self.connection.execute('VACUUM')
+                if count > 1:
+                    raise e
         return obj
 
 
