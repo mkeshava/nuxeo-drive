@@ -220,12 +220,12 @@ class ConfigWatcher(object):
             try:
                 current_upload_rate = int(Manager.get()._dao.get_config('upload_rate', -1))
             except ValueError:
-                current_upload_rate = 0
+                current_upload_rate = -1
 
             try:
                 current_download_rate = int(Manager.get()._dao.get_config('download_rate', -1))
             except ValueError:
-                current_download_rate = 0
+                current_download_rate = -1
 
             change = not (new_upload_rate == current_upload_rate and new_download_rate == current_download_rate)
             if not change:
@@ -233,7 +233,7 @@ class ConfigWatcher(object):
 
             slower = new_upload_rate < current_upload_rate or new_download_rate < current_download_rate
             if slower:
-                # change processors first, then upadate the rate(s)
+                # change processors first, then update the rate(s)
                 ConfigWatcher.ConfigModifiedEventHandler.change_processors(new_upload_rate, new_download_rate)
 
             if new_upload_rate != current_upload_rate:
