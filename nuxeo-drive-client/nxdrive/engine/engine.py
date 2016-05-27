@@ -15,6 +15,8 @@ from threading import current_thread
 from nxdrive.osi import AbstractOSIntegration
 from nxdrive.engine.workers import Worker, ThreadInterrupt, PairInterrupt
 from nxdrive.engine.activity import Action, FileAction
+from dao.sqlite import CorruptedDatabase, backup_database
+
 from time import sleep
 WindowsError = None
 try:
@@ -440,7 +442,11 @@ class Engine(QObject):
 
     def _create_dao(self):
         from nxdrive.engine.dao.sqlite import EngineDAO
-        return EngineDAO(self._get_db_file())
+        try:
+            return EngineDAO(self._get_db_file())
+        except CorruptedDatabase:
+            db_file_backup = backup_database(self._get_db_file())
+            return EngineDAO(db_file_backup)
 
     def get_remote_url(self):
         server_link = self._dao.get_config("server_url", "")

@@ -1,4 +1,5 @@
 import sqlite3
+# import apsw
 import os
 import inspect
 from threading import Lock, local, current_thread
@@ -73,36 +74,85 @@ def _get_remote_state_from_pair_state(pair_state):
         return remote_states.pop()
 
 
+def backup_database(db_file):
+    # dump the darabase to a sql file
+    filename, fileext  = os.path.splitext(db_file)
+    db_file_sql = filename + '.sql'
+    src_con = sqlite3.connect(db_file)
+    with open(db_file_sql, 'w') as f:
+        lines = src_con.iterdump()
+        while True:
+            try:
+                line = lines.next()
+                log.trace(line)
+                f.write('%s\n' % line.encode('utf-8'))
+            except StopIteration:
+                break
+            except Exception as e:
+                log.trace("error dumping line: %s", str(e))
+
+    # load sql file in an in-memory database
+    db_file_backup = filename + '_backup' + fileext
+    dst_con = sqlite3.connect(db_file_backup)
+    with open(db_file_sql, 'r') as f:
+        dst_con.cursor().executescript(f.read())
+    src_con.close()
+    dst_con.close()
+    return db_file_backup
+
+
 LOCAL_STATES_VALUES, REMOTE_STATES_VALUES, PAIR_STATES_VALUES = _get_states_values()
 
 
+class CorruptedDatabase(Exception):
+    pass
+
+
 class AutoRetryCursor(sqlite3.Cursor):
+    def __init__(self, cursor_class):
+        super(AutoRetryCursor, self).__init__(cursor_class)
+        self.count = 0
+
     def execute(self, *args, **kwargs):
-        count = 0
         obj = None
+
         while (1):
             try:
-                count += 1
+                self.count += 1
                 obj = super(AutoRetryCursor, self).execute(*args, **kwargs)
-                if count > 1:
-                    log.trace('Result returned from try #%d', count)
+                if self.count > 1:
+                    log.trace('Result returned from try #%d', self.count)
+                self.count = 0
                 break
             except sqlite3.OperationalError as e:
-                log.trace('Retry locked database #%d', count)
-                if count > 5:
+                log.trace('Retry locked database #%d', self.count)
+                if self.count > 5:
                     raise e
             except sqlite3.DatabaseError as e:
-                log.trace('compact the database database')
+                if self.count > 1 or self.connection['recursive_execute_error_count'] > 1:
+                    log.trace("failed to compact the database")
+                    raise CorruptedDatabase()
+                log.trace('compact the database')
+                self.connection['recursive_execute_error_count'] += 1
                 self.connection.rollback()
                 self.connection.execute('VACUUM')
-                if count > 1:
-                    raise e
+                self.connection['recursive_execute_error_count'] = 0
         return obj
 
 
 class AutoRetryConnection(sqlite3.Connection):
+    def __init__(self, db, check_same_thread = False):
+        super(AutoRetryConnection, self).__init__(db, check_same_thread=check_same_thread)
+        self.recursive_execute_error_count = 0
+
     def cursor(self):
         return super(AutoRetryConnection, self).cursor(AutoRetryCursor)
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
 
 
 class CustomRow(sqlite3.Row):
@@ -203,6 +253,7 @@ class ConfigurationDAO(QObject):
         # Use to clean
         self._connections = []
         self._create_main_conn()
+        # self._apsw_connection = None
         self._conn.row_factory = CustomRow
         c = self._conn.cursor()
         self._init_db(c)
@@ -262,9 +313,12 @@ class ConfigurationDAO(QObject):
         cursor.execute("CREATE TABLE if not exists Configuration(name VARCHAR NOT NULL, value VARCHAR, PRIMARY KEY (name))")
 
     def _create_main_conn(self):
-        log.debug("Create main connexion on %s (dir exists: %d / file exists: %d)",
+        log.debug("Create main connection on %s (dir exists: %d / file exists: %d)",
                     self._db, os.path.exists(os.path.dirname(self._db)), os.path.exists(self._db))
+
+        self._apsw_connection = apsw.Connection(':memory:')
         self._conn = AutoRetryConnection(self._db, check_same_thread=False)
+        # self._conn = AutoRetryConnection(self._apsw_connection, check_same_thread=False)
         self._connections.append(self._conn)
 
     def _log_trace(self, query):
