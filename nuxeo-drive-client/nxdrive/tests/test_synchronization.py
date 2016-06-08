@@ -40,7 +40,7 @@ class TestSynchronization(UnitTestCase):
         self.assertTrue(local.exists('/Folder 1/Folder 1.2'))
         self.assertEquals(local.get_content('/Folder 1/Folder 1.2/File 3.txt'), "ccc")
         self.assertTrue(local.exists('/Folder 2'))
-        # Cannot predicte the resolution in advance
+        # Cannot predict the resolution in advance
         self.assertTrue(remote.get_content(self._duplicate_file_1), "Some content.")
         self.assertTrue(remote.get_content(self._duplicate_file_2), "Other content.")
         if local.get_content('/Folder 2/Duplicated File.txt') == "Some content.":
@@ -445,7 +445,6 @@ class TestSynchronization(UnitTestCase):
         # Increase Automation execution timeout for NuxeoDrive.GetChangeSummary
         # because of the recursive parent FileSystemItem adaptation
         self.engine_1.timeout = 90
-        self.engine_1.start()
 
         # Create a file deep down in the hierarchy
         remote = self.remote_document_client_1
@@ -458,7 +457,10 @@ class TestSynchronization(UnitTestCase):
 
         remote.make_file(folder, "File.odt", content="Fake non-zero content.")
 
-        self.wait_sync(wait_for_async=True, timeout=90)
+        # Wait for ES indexing
+        self.wait()
+        self.engine_1.start()
+        self.wait_sync(timeout=90)
 
         local = self.local_client_1
         expected_folder_path = ('/' + folder_name) * folder_depth

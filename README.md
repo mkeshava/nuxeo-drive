@@ -31,7 +31,7 @@ Installing Nuxeo Drive requires two components: a server addon for the Nuxeo Pla
 
 **Stable releases for Nuxeo Drive** are available as a Marketplace package from the Nuxeo Online Services portal: [https://connect.nuxeo.com/nuxeo/site/marketplace/package/nuxeo-drive](https://connect.nuxeo.com/nuxeo/site/marketplace/package/nuxeo-drive)
 
-You can also fetch the **latest development version** of the [Marketplace package for the Nuxeo master branch](http://qa.nuxeo.org/jenkins/job/addons_nuxeo-drive-master-marketplace) from the Continuous Integration server (use at your own risk).
+You can also fetch the **latest development version** of the [Marketplace package for the Nuxeo master branch](http://qa.nuxeo.org/jenkins/job/master/job/addons_nuxeo-drive-master-marketplace) from the Continuous Integration server (use at your own risk).
 
 ### Installing the Marketplace Package
 
@@ -121,13 +121,13 @@ cat $ofile
 
 Once the Marketplace package is installed, the Mac OS X desktop client package can be downloaded from the **Home** > **Nuxeo Drive** tab.
 
-You can also fetch the latest development version for Mac OS X from the [our Continous Integration server](https://qa.nuxeo.org/jenkins/job/nuxeo-drive-dmg).
+You can also fetch the latest development version for Mac OS X from the [our Continous Integration server](https://qa.nuxeo.org/jenkins/job/other/job/nuxeo-drive-dmg).
 
 ### Windows Desktop Client
 
 Once the Marketplace package is installed, the Windows desktop client package can be downloaded from the **Home** > **Nuxeo Drive** tab.
 
-You can also fetch the latest development version for nuxeo-drive-<version>-win32.msi Windows installer from [our Continuous Integration server](http://qa.nuxeo.org/jenkins/job/nuxeo-drive-msi/).
+You can also fetch the latest development version for nuxeo-drive-<version>-win32.msi Windows installer from [our Continuous Integration server](http://qa.nuxeo.org/jenkins/job/other/job/nuxeo-drive-msi/).
 
 Once you installed the package (Administrator rights required) the new folder holding the ndrive.exe and ndrivew.exe programs will be added to your `Path` environment variable automatically.
 
@@ -199,6 +199,22 @@ For more options, type:
 ndrive --help
 ndrive subcommand --help
 ```
+
+### Building pip package
+
+On Mac you can face an issue with your locale with a message like
+
+```
+ValueError: unknown locale: UTF-8
+```
+
+In that case you need to specify your locale as :
+
+```
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+```
+
 
 ## Reporting Issues
 

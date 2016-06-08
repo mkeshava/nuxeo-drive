@@ -364,9 +364,9 @@ class Manager(QtCore.QObject):
             # No log_level provide, use the one from db default is INFO
             self._update_logger(int(self._dao.get_config("log_level_file", "20")))
         # Add auto lock on edit
-        res = self._dao.get_config("drive_edit_auto_lock")
+        res = self._dao.get_config("direct_edit_auto_lock")
         if res is None:
-            self._dao.update_config("update_url", "1")
+            self._dao.update_config("direct_edit_auto_lock", "1")
         # Persist update URL infos
         self._dao.update_config("update_url", options.update_site_url)
         self._dao.update_config("beta_update_url", options.beta_update_site_url)
@@ -383,9 +383,9 @@ class Manager(QtCore.QObject):
         log.debug('download rate: %s', str(BaseAutomationClient.download_token_bucket))
         self.config_watcher = ConfigWatcher()
 
-        # Create DriveEdit
+        # Create DirectEdit
         self._create_autolock_service()
-        self._create_drive_edit(options.protocol_url)
+        self._create_direct_edit(options.protocol_url)
         # Create notification service
         self._script_engine = None
         self._script_object = None
@@ -617,16 +617,19 @@ class Manager(QtCore.QObject):
     def _get_beta_update_url(self, refresh_engines):
         beta_update_url = self._dao.get_config("beta_update_url")
         if beta_update_url is None:
-            if refresh_engines:
-                self._refresh_engine_update_infos()
-            engines = self.get_engines()
-            if engines:
-                for engine in engines.itervalues():
-                    beta_update_url = engine.get_beta_update_url()
-                    if beta_update_url is not None:
-                        log.debug('Beta update site URL has not been defined in config.ini nor through the command'
-                                  ' line, using configuration from engine [%s]: %s', engine._name, beta_update_url)
-                        return beta_update_url
+            try:
+                if refresh_engines:
+                    self._refresh_engine_update_infos()
+                engines = self.get_engines()
+                if engines:
+                    for engine in engines.itervalues():
+                        beta_update_url = engine.get_beta_update_url()
+                        if beta_update_url is not None:
+                            log.debug('Beta update site URL has not been defined in config.ini nor through the command'
+                                      ' line, using configuration from engine [%s]: %s', engine._name, beta_update_url)
+                            return beta_update_url
+            except URLError:
+                log.exception('Cannot refresh engine update infos, not using beta update site URL')
         return beta_update_url
 
     def is_beta_channel_available(self):
@@ -646,14 +649,14 @@ class Manager(QtCore.QObject):
             for engine in engines.itervalues():
                 engine.get_update_infos()
 
-    def _create_drive_edit(self, url):
-        from nxdrive.drive_edit import DriveEdit
-        self._drive_edit = DriveEdit(self, os.path.join(normalized_path(self.nxdrive_home), "edit"), url)
-        self.started.connect(self._drive_edit._thread.start)
-        return self._drive_edit
+    def _create_direct_edit(self, url):
+        from nxdrive.direct_edit import DirectEdit
+        self._direct_edit = DirectEdit(self, os.path.join(normalized_path(self.nxdrive_home), "edit"), url)
+        self.started.connect(self._direct_edit._thread.start)
+        return self._direct_edit
 
-    def get_drive_edit(self):
-        return self._drive_edit
+    def get_direct_edit(self):
+        return self._direct_edit
 
     def is_paused(self):
         return self._pause
@@ -848,11 +851,11 @@ class Manager(QtCore.QObject):
     def set_config(self, key, value):
         return self._dao.update_config(key, value)
 
-    def get_drive_edit_auto_lock(self):
-        return self._dao.get_config("drive_edit_auto_lock", "1") == "1"
+    def get_direct_edit_auto_lock(self):
+        return self._dao.get_config("direct_edit_auto_lock", "1") == "1"
 
-    def set_drive_edit_auto_lock(self, value):
-        self._dao.update_config("drive_edit_auto_lock", value)
+    def set_direct_edit_auto_lock(self, value):
+        self._dao.update_config("direct_edit_auto_lock", value)
 
     def get_auto_update(self):
         # By default auto update
