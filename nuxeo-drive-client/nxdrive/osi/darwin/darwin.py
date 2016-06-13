@@ -44,8 +44,13 @@ class RightClickService(NSObject):
                     else:
                         value = url.path()
                     log.debug("Should open : %s", value)
-                    from PyQt4.QtCore import QCoreApplication
-                    QCoreApplication.instance().show_metadata(value)
+                    # from PyQt4.QtCore import QCoreApplication
+                    # QCoreApplication.instance().show_metadata(value)
+                    file_path = normalized_path(value)
+                    self.log.debug('Opening Mac CPO metadata window for %r', file_path)
+                    _, _, engine, _ = self.manager.get_metadata_infos(file_path)
+                    return engine.open_edit_metadata_url(file_path)
+
             return None
         except Exception as e:
             log.exception(e)
