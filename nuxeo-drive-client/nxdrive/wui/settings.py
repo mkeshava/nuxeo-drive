@@ -90,6 +90,7 @@ class WebSettingsApi(WebDriveApi):
         if isinstance(local_folder, QtCore.QString):
             local_folder = str(local_folder.toUtf8()).decode('utf-8')
         url = str(url)
+        # Need to pass unicode string instead 'utf-8' string to store into the database
         name = unicode(username)
         # On first time login convert QString(having special characters) to str
         if username and isinstance(username, QtCore.QString):
