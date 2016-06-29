@@ -7,6 +7,7 @@ import os
 import shutil
 import re
 import tempfile
+from functools import wraps
 from nxdrive.client.common import BaseClient, UNACCESSIBLE_HASH
 from nxdrive.osi import AbstractOSIntegration
 
@@ -28,6 +29,31 @@ log = get_logger(__name__)
 
 
 DEDUPED_BASENAME_PATTERN = ur'^(.*)__(\d{1,3})$'
+DEDUPED_MAX_COUNT = 1000
+
+
+class LimitExceededError(ValueError):
+    def __init__(self, result, msg):
+        super(LimitExceededError, self).__init__(msg)
+        self.result = result
+
+    def __repr__(self):
+        return super(LimitExceededError, self).__repr__()
+
+
+def file_override(limit):
+    def wrapper(f):
+        @wraps(f)
+        def wrapped_f(*args, **kwargs):
+            try:
+                kwargs['limit'] = limit
+                return f(*args, **kwargs)
+            except LimitExceededError as ex:
+                return ex.result
+
+        wrapped_f.__args__ = (limit,)
+        return wrapped_f
+    return wrapper
 
 
 # Data transfer objects
@@ -754,15 +780,23 @@ class LocalClient(BaseClient):
         os_path = self._abspath(os.path.join(parent, name + suffix))
         return os_path
 
-    def _abspath_deduped(self, parent, orig_name, old_name=None):
+    # @file_override(3)
+    def _abspath_deduped(self, parent, orig_name, old_name=None, limit=DEDUPED_MAX_COUNT):
         """Absolute path on the operating system with deduplicated names"""
+        if limit < 2:
+            raise ValueError("limit must be 2 or greater")
         # make name safe by removing invalid chars
         name = safe_filename(orig_name)
 
         # decompose the name into actionable components
-        name, suffix = os.path.splitext(name)
+        # CSPII-11017: avoid directories with names like 2.0.16, etc. which are deduped as 2.0__1.16
+        # (instead of 2.0.16__1)
+        if os.path.isfile(self._abspath(os.path.join(parent, name))):
+            name, suffix = os.path.splitext(name)
+        else:
+            suffix = ''
 
-        for _ in range(1000):
+        for _ in range(limit):
             os_path = self._abspath(os.path.join(parent, name + suffix))
             if old_name == (name + suffix):
                 return os_path, name + suffix
@@ -777,7 +811,9 @@ class LocalClient(BaseClient):
                 short_name, increment = m.groups()
                 name = u"%s__%d" % (short_name, int(increment) + 1)
             else:
-                name = name + u'__1'
+                name += u'__1'
             log.trace("Deduplicate a name: %s", name, exc_info=True)
-        raise ValueError("Failed to de-duplicate '%s' under '%s'" % (
+
+        name, _ = os.path.splitext(os.path.basename(os_path))
+        raise LimitExceededError((os_path, name+suffix), "Failed to de-duplicate '%s' under '%s'" % (
             orig_name, parent))
