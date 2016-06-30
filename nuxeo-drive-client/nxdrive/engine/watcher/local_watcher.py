@@ -974,19 +974,6 @@ class LocalWatcher(EngineWorker):
         result = doc_pair.local_path == other_doc_pair.local_path and doc_pair.folderish == other_doc_pair.folderish
         if result and not doc_pair.folderish:
             result = doc_pair.local_digest == other_doc_pair.local_digest
-        elif result and doc_pair.folderish:
-            # recursive compare
-            children_info = self.client.get_children_info(doc_pair.local_path)
-            children_doc_pair = [self._dao.get_state_from_local(child_info.local_path) for child_info in children_info]
-            other_children_doc_pair = [self._dao.get_normal_state_from_remote(child_info.remote_ref)
-                                       for child_info in children_info if child_info.remote_ref is not None]
-            if len(children_doc_pair) != len(other_children_doc_pair):
-                result = False
-            else:
-                for child_doc_pair, other_child_doc_pair in zip((children_doc_pair, other_children_doc_pair)):
-                    if not self._pair_equal_locally(children_doc_pair, other_child_doc_pair):
-                        result = False
-                        break
 
         return result
 
