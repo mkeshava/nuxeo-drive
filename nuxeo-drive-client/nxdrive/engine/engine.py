@@ -775,6 +775,7 @@ class Engine(QObject):
         # Save the configuration
         self._dao.update_config("web_authentication", self._web_authentication)
         self._dao.update_config("server_url", self._server_url)
+        # Need to decode the 'utf-8' string to store into the database
         self._dao.update_config("remote_user", self._remote_user)
         self._dao.update_config("remote_password", self._remote_password)
         self._dao.update_config("remote_token", self._remote_token)
@@ -876,8 +877,9 @@ class Engine(QObject):
         self._dao.insert_local_state(local_info, '')
         row = self._dao.get_state_from_local('/')
         self._dao.update_remote_state(row, remote_info, remote_parent_path='', versionned=False)
-        local_client.set_root_id(self._server_url + "|" + self._remote_user +
-                            "|" + self._manager.device_id + "|" + self._uid)
+        # Need to decode the 'utf-8' string to set the nx-attribute for root folder
+        local_client.set_root_id(self._server_url + "|" + self._remote_user + 
+                                 "|" + self._manager.device_id + "|" + self._uid)
         local_client.set_remote_id('/', remote_info.uid)
         self._dao.synchronize_state(row)
         # The root should also be sync

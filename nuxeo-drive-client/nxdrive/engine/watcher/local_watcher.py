@@ -870,12 +870,25 @@ class LocalWatcher(EngineWorker):
                 if local_info.remote_ref is not None:
                     moved = False
                     from_pair = self._dao.get_normal_state_from_remote(local_info.remote_ref)
+                    log.trace('remote info: %s', repr(local_info))
+                    log.trace("compare event pair: %s and pair with same remote ref: %s locally",
+                              repr(doc_pair), repr(from_pair))
+                    # todo check that from_pair has the same hash and local (relative) path
+                    if not self._pair_equal_locally(from_pair, doc_pair):
+                        # remove the remote ref "annotation"
+                        self.client.remove_remote_id(rel_path)
+                        from_pair = None
+
+                    log.trace('pair with same remote ref: %s', 'none' if from_pair is None else repr(from_pair))
                     if from_pair is not None:
                         if from_pair.processor > 0 or from_pair.local_path == rel_path:
                             # First condition is in process
                             # Second condition is a race condition
                             log.trace("Ignore creation or modification as the coming pair is being processed: %r",
                                       rel_path)
+                            # todo should not return but requeue the event
+                            # todo also if the hash is the same (on a file)?
+                            self._watchdog_queue.put(evt)
                             return
                         # If it is not at the origin anymore, magic teleportation, only on Windows ?
                         if not self.client.exists(from_pair.local_path):
@@ -952,6 +965,17 @@ class LocalWatcher(EngineWorker):
                         mktime(local_info.last_modification_time.timetuple()), doc_pair)
             finally:
                 self._win_lock.release()
+
+    def _pair_equal_locally(self, doc_pair, other_doc_pair):
+        if doc_pair == other_doc_pair:
+            return True
+        if doc_pair is None or other_doc_pair is None:
+            return False
+        result = doc_pair.local_path == other_doc_pair.local_path and doc_pair.folderish == other_doc_pair.folderish
+        if result and not doc_pair.folderish:
+            result = doc_pair.local_digest == other_doc_pair.local_digest
+
+        return result
 
 
 class DriveFSEventHandler(FileSystemEventHandler):
