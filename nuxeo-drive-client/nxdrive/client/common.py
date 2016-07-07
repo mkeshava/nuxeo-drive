@@ -86,6 +86,10 @@ DEFAULT_IGNORED_SUFFIXES = [
 FILE_BUFFER_SIZE_NO_RATE_LIMIT = 1024 ** 2
 FILE_BUFFER_SIZE_WITH_RATE_LIMIT = 1024 * 128
 
+# max number of times a file/folder could be duplicated due to conflict
+# (like name__1.txt, name__2.txt, etc.); afterwards, name__3.txt will be overwritten
+MAX_DUPLICATES = 3
+
 # Name of the folder holding the files locally edited from Nuxeo
 LOCALLY_EDITED_FOLDER_NAME = 'Locally Edited'
 

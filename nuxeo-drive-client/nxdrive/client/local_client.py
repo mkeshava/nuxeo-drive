@@ -18,6 +18,7 @@ from nxdrive.client.common import safe_filename
 from nxdrive.client.common import NotFound
 from nxdrive.client.common import DEFAULT_IGNORED_PREFIXES
 from nxdrive.client.common import DEFAULT_IGNORED_SUFFIXES
+from nxdrive.client.common import MAX_DUPLICATES
 from nxdrive.utils import normalized_path
 from nxdrive.utils import safe_long_path
 from nxdrive.utils import guess_digest_algorithm
@@ -780,7 +781,7 @@ class LocalClient(BaseClient):
         os_path = self._abspath(os.path.join(parent, name + suffix))
         return os_path
 
-    # @file_override(3)
+    @file_override(MAX_DUPLICATES)
     def _abspath_deduped(self, parent, orig_name, old_name=None, limit=DEDUPED_MAX_COUNT):
         """Absolute path on the operating system with deduplicated names"""
         if limit < 2:
