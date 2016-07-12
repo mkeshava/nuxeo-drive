@@ -31,6 +31,7 @@ log = get_logger(__name__)
 
 DEDUPED_BASENAME_PATTERN = ur'^(.*)__(\d{1,3})$'
 DEDUPED_MAX_COUNT = 1000
+DEDUPED_LIMITED_COUNT = 3
 
 
 class LimitExceededError(ValueError):
@@ -580,11 +581,11 @@ class LocalClient(BaseClient):
         finally:
             self.lock_ref(parent, locker)
 
-    def duplicate_file(self, ref):
+    def duplicate_file(self, ref, limit=DEDUPED_LIMITED_COUNT):
         parent = os.path.dirname(ref)
         name = os.path.basename(ref)
         locker = self.unlock_ref(parent, False)
-        os_path, name = self._abspath_deduped(parent, name)
+        os_path, name = self._abspath_deduped(parent, name, limit=limit)
         try:
             shutil.copy(self._abspath(ref), os_path)
             if parent == u"/":
@@ -781,9 +782,17 @@ class LocalClient(BaseClient):
         os_path = self._abspath(os.path.join(parent, name + suffix))
         return os_path
 
-    @file_override(MAX_DUPLICATES)
-    def _abspath_deduped(self, parent, orig_name, old_name=None, limit=DEDUPED_MAX_COUNT):
-        """Absolute path on the operating system with deduplicated names"""
+    def _abspath_deduped(self, parent, orig_name, old_name=None, limit=DEDUPED_LIMITED_COUNT):
+        """
+        Return the absolute path on the operating system with deduplicated names.
+        :param parent: parent folder's relative path
+        :param orig_name: item (file or folder) name to be deduplicated
+        :param old_name:
+        :param limit: max number of times the orig_name can exist (including original name)
+        :raise LimitExceededError if max number of duplicates (including the original) has been reached.
+                ValueError if deduplication is disabled.
+        :return: full path and name (base + extension) of deduplicated item
+        """
         if limit < 2:
             raise ValueError("limit must be 2 or greater")
         # make name safe by removing invalid chars
