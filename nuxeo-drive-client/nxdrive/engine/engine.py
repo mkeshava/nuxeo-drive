@@ -9,6 +9,7 @@ from nxdrive.client import LocalClient
 from nxdrive.client import RemoteFileSystemClient
 from nxdrive.client import RemoteFilteredFileSystemClient
 from nxdrive.client import RemoteDocumentClient
+from nxdrive.client.local_client import DEDUPED_MAX_COUNT
 from nxdrive.utils import normalized_path
 from nxdrive.engine.processor import Processor
 from threading import current_thread
@@ -542,8 +543,10 @@ class Engine(QObject):
 
         def run():
             local_client = self.get_local_client()
-            # Duplicate the file
-            local_client.duplicate_file(row.local_path)
+            # Duplicate the file (up to DEDUPED_MAX_COUNT=1000) if this is the result
+            # of user selecting 'duplicate' option from the sync conflicts dialog.
+            # HACK: for accidental duplication, limit to DEDUPED_LIMITED_COUNT=3
+            local_client.duplicate_file(row.local_path, limit=DEDUPED_MAX_COUNT)
             # Force the remote
             self._dao.force_remote(row)
         self._duplicate_thread = Thread(target=run)

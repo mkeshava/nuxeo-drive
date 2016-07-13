@@ -583,12 +583,14 @@ class Processor(EngineWorker):
 
     def _download_content(self, local_client, remote_client, doc_pair, file_path):
         # Check if the file is already on the HD
+        # todo checks if a synchronized file with the same digest exists, but anywhere, not in the same parent (folder)
         pair = self._dao.get_valid_duplicate_file(doc_pair.remote_digest)
         if pair:
             import shutil
             file_out = self._get_temporary_file(file_path)
             locker = local_client.unlock_path(file_out)
             try:
+                # todo what happens if it throws exception here, e.g. source file does not exist?
                 shutil.copy(local_client._abspath(pair.local_path), file_out)
             finally:
                 local_client.lock_path(file_out, locker)
