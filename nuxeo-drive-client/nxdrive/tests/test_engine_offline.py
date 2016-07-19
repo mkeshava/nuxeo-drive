@@ -68,16 +68,16 @@ class EngineOffLineTestCase(UnitTestCase):
         sleep(35)
 
         # Create a folder inside user folder and a file inside the folder
-        self.local_client_1.make_folder(u'/', 'NetworkError')
-        self.local_client_1.make_file(u'/NetworkError', 'NetworkErrorFile.txt', content="test network failure")
+        self.local_client_1.make_folder('/', 'FolderA')
+        self.local_client_1.make_file('/FolderA', 'TestFile.txt', content="test network failure")
         # Wait for events to be handled
         sleep(35)
 
         # Check pair_state and error_count for the folder/file because it should not try to sync when engine is offline
-        test_folder = self.get_dao_state_from_engine_1('/NetworkError')
+        test_folder = self.get_dao_state_from_engine_1('/FolderA')
         self.assertEqual(test_folder.pair_state, 'locally_created')
         self.assertEqual(test_folder.error_count, 0)
-        test_file = self.get_dao_state_from_engine_1('/NetworkError/NetworkErrorFile.txt')
+        test_file = self.get_dao_state_from_engine_1('/FolderA/TestFile.txt')
         self.assertEqual(test_file.pair_state, 'locally_created')
         self.assertEqual(test_file.error_count, 0)
 
@@ -88,9 +88,9 @@ class EngineOffLineTestCase(UnitTestCase):
         sleep(60)
 
         # pair_state should be 'synchronized' for the folder/file
-        test_folder = self.get_dao_state_from_engine_1('/NetworkError')
+        test_folder = self.get_dao_state_from_engine_1('/FolderA')
         self.assertEqual(test_folder.pair_state, 'synchronized')
-        test_file = self.get_dao_state_from_engine_1('/NetworkError/NetworkErrorFile.txt')
+        test_file = self.get_dao_state_from_engine_1('/FolderA/TestFile.txt')
         self.assertEqual(test_file.pair_state, 'synchronized')
 
     def test_with_manual_pause_resume(self):
@@ -108,16 +108,16 @@ class EngineOffLineTestCase(UnitTestCase):
         self.engine_1.suspend()
 
         # Create a folder inside user folder and a file inside the folder
-        self.local_client_1.make_folder(u'/', 'ManualPause')
-        self.local_client_1.make_file(u'/ManualPause', 'ManualPauseFile.txt', content="test manual pause and resume")
+        self.local_client_1.make_folder('/', 'FolderB')
+        self.local_client_1.make_file('/FolderB', 'TestFile1.txt', content="test manual pause and resume")
         # Wait for events to be handled
         sleep(35)
 
         # queue manager will not process for the folder/file when engine is paused and
         # database should not have entries for the folder/file
-        test_folder = self.get_dao_state_from_engine_1('/ManualPause')
+        test_folder = self.get_dao_state_from_engine_1('/FolderB')
         self.assertIsNone(test_folder)
-        test_file = self.get_dao_state_from_engine_1('/ManualPause/ManualPauseFile.txt')
+        test_file = self.get_dao_state_from_engine_1('/FolderB/TestFile1.txt')
         self.assertIsNone(test_file)
 
         # Resume the engine
@@ -126,7 +126,7 @@ class EngineOffLineTestCase(UnitTestCase):
         sleep(60)
 
         # pair_state should be 'synchronized' for the folder/file
-        test_folder = self.get_dao_state_from_engine_1('/ManualPause')
+        test_folder = self.get_dao_state_from_engine_1('/FolderB')
         self.assertEqual(test_folder.pair_state, 'synchronized')
-        test_file = self.get_dao_state_from_engine_1('/ManualPause/ManualPauseFile.txt')
+        test_file = self.get_dao_state_from_engine_1('/FolderB/TestFile1.txt')
         self.assertEqual(test_file.pair_state, 'synchronized')
