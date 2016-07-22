@@ -570,7 +570,10 @@ class LocalClient(BaseClient):
 
     def make_folder(self, parent, name):
         locker = self.unlock_ref(parent, False)
-        os_path, name = self._abspath_deduped(parent, name)
+        # HACK CSPII-10932 allow duplicating folder which is a direct descendent of /Other Docs
+        # This is the case when 2 users share each a folder with same name, with this user
+        disable_duplication = not (hasattr(self, 'is_shared_root') and getattr(self, 'is_shared_root', None)(parent))
+        os_path, name = self._abspath_deduped(parent, name, disable_duplication=disable_duplication)
         try:
             os.mkdir(os_path)
             # Name should be the actual name of the folder created locally
@@ -581,11 +584,11 @@ class LocalClient(BaseClient):
         finally:
             self.lock_ref(parent, locker)
 
-    def duplicate_file(self, ref, limit=DEDUPED_LIMITED_COUNT):
+    def duplicate_file(self, ref, limit=DEDUPED_LIMITED_COUNT, disable_duplication=None):
         parent = os.path.dirname(ref)
         name = os.path.basename(ref)
         locker = self.unlock_ref(parent, False)
-        os_path, name = self._abspath_deduped(parent, name, limit=limit)
+        os_path, name = self._abspath_deduped(parent, name, limit=limit, disable_duplication=disable_duplication)
         try:
             shutil.copy(self._abspath(ref), os_path)
             if parent == u"/":
@@ -782,7 +785,7 @@ class LocalClient(BaseClient):
         os_path = self._abspath(os.path.join(parent, name + suffix))
         return os_path
 
-    def _abspath_deduped(self, parent, orig_name, old_name=None, limit=DEDUPED_LIMITED_COUNT):
+    def _abspath_deduped(self, parent, orig_name, old_name=None, limit=DEDUPED_LIMITED_COUNT, disable_duplication=None):
         """
         Return the absolute path on the operating system with deduplicated names.
         :param parent: parent folder's relative path
@@ -795,6 +798,13 @@ class LocalClient(BaseClient):
         """
         if limit < 2:
             raise ValueError("limit must be 2 or greater")
+
+        # HACK override "disable_duplication" option for each invokation
+        # CSPII-10932 field self._disable_duplication can be configured with the
+        # "--disable-duplication" command-line argument
+        __disable_duplication = self._disable_duplication
+        if disable_duplication is not None:
+            __disable_duplication = disable_duplication
         # make name safe by removing invalid chars
         name = safe_filename(orig_name)
 
@@ -812,8 +822,8 @@ class LocalClient(BaseClient):
                 return os_path, name + suffix
             if not os.path.exists(os_path):
                 return os_path, name + suffix
-            if self._disable_duplication:
-                raise ValueError("De-duplication is disabled")
+            if __disable_duplication:
+                raise LimitExceededError(None, "De-duplication is disabled")
             # the is a duplicated file, try to come with a new name
             log.trace("dedup: %s exist try next", os_path)
             m = re.match(DEDUPED_BASENAME_PATTERN, name)

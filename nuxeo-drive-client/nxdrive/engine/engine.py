@@ -27,6 +27,7 @@ import datetime
 from cookielib import CookieJar
 from nxdrive.client.common import safe_filename
 from nxdrive.gui.resources import find_icon
+from nxdrive.client.local_client import LimitExceededError
 from nxdrive.engine.username_resolver import UserNameResolver
 
 log = get_logger(__name__)
@@ -548,10 +549,16 @@ class Engine(QObject):
             local_client = self.get_local_client()
             # Duplicate the file (up to DEDUPED_MAX_COUNT=1000) if this is the result
             # of user selecting 'duplicate' option from the sync conflicts dialog.
-            # HACK: for accidental duplication, limit to DEDUPED_LIMITED_COUNT=3
-            local_client.duplicate_file(row.local_path, limit=DEDUPED_MAX_COUNT)
-            # Force the remote
-            self._dao.force_remote(row)
+            # HACK for accidental duplication, limit to DEDUPED_LIMITED_COUNT=3
+            # HACK override the global setting with command-line argument "--disable-duplication" when
+            # user selects Duplicate option for resolving a file conflict
+            try:
+                local_client.duplicate_file(row.local_path, limit=DEDUPED_MAX_COUNT, disable_duplication=False)
+            except LimitExceededError as e:
+                self._dao.increase_error(row, repr(e))
+            else:
+                # Force the remote
+                self._dao.force_remote(row)
         self._duplicate_thread = Thread(target=run)
         self._duplicate_thread.start()
 
