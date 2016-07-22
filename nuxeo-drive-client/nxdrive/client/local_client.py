@@ -572,9 +572,6 @@ class LocalClient(BaseClient):
         locker = self.unlock_ref(parent, False)
         # HACK CSPII-10932 allow duplicating folder which is a direct descendent of /Other Docs
         # This is the case when 2 users share each a folder with same name, with this user
-        log.trace('in make_folder: has is_shared_root=%s', 'yes' if hasattr(self, 'is_shared_root') else 'no')
-        log.trace('in make_folder: parent=%s', parent)
-        log.trace('in make_folder: is_shared_root(parent)=%s', 'yes' if getattr(self, 'is_shared_root', None)(parent) else 'no')
         disable_duplication = not (hasattr(self, 'is_shared_root') and getattr(self, 'is_shared_root', None)(parent))
         os_path, name = self._abspath_deduped(parent, name, disable_duplication=disable_duplication)
         try:
@@ -805,8 +802,6 @@ class LocalClient(BaseClient):
         # HACK override "disable_duplication" option for each invokation
         # CSPII-10932 field self._disable_duplication can be configured with the
         # "--disable-duplication" command-line argument
-        log.trace('in _abspath_deduped: disable_duplication=%s', disable_duplication)
-        log.trace('in _abspath_deduped: self._disable_duplication=%s', self._disable_duplication)
         __disable_duplication = self._disable_duplication
         if disable_duplication is not None:
             __disable_duplication = disable_duplication
