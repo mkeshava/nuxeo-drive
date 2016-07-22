@@ -1531,4 +1531,4 @@ class EngineDAO(ConfigurationDAO):
             For not yet resolved users, the last_refreshed will be datetime.min
         '''
         c = self._get_read_connection(factory=CustomRow).cursor()
-        return c.execute("SELECT * from Users where last_refreshed > datetime('now', '-1 day')").fetchall()
+        return c.execute("SELECT * from Users where last_refreshed < datetime('now', '-1 day')").fetchall()
