@@ -11,7 +11,6 @@ import hashlib
 import tempfile
 import itertools
 from urllib import urlencode
-from PyQt4.QtCore import QCoreApplication
 from poster.streaminghttp import get_handlers
 from nxdrive.logging_config import get_logger
 from nxdrive.client.common import BaseClient
@@ -52,6 +51,7 @@ LESS_THAN_100000KBS = 100000
 NO_LIMIT = -1
 
 DM_READ_TIMEOUT = 20000  # 20 sec
+DM_UPLOAD_LATENCY = 500 #msec
 
 FILE_BUFFER_SIZES = {
     LESS_THAN_1000KBS: FILE_BUFFER_SIZE_WITH_RATE_LIMIT,
@@ -116,6 +116,10 @@ class InvalidBatchException(Exception):
     
     def __str__(self):
         return "Invalid batch exception"
+
+
+class UploadException(Exception):
+    pass
 
 
 def get_proxies_for_handler(proxy_settings):
@@ -931,6 +935,9 @@ class BaseAutomationClient(BaseClient):
             if e.code == 401 or e.code == 403:
                 raise Unauthorized(self.server_url, self.user_id, e.code)
             else:
+                details = self._log_details(e)
+                if details:
+                    log.trace("error: %s", str(details))
                 msg = base_error_message + "\nHTTP error %d" % e.code
                 if hasattr(e, 'msg'):
                     msg = msg + ": " + e.msg
@@ -941,18 +948,17 @@ class BaseAutomationClient(BaseClient):
             if hasattr(e, 'message') and e.message:
                 e_msg = force_decode(": " + e.message)
                 if e_msg is not None:
-                    msg = msg + e_msg
+                    msg += e_msg
             elif hasattr(e, 'reason') and e.reason:
-                if (hasattr(e.reason, 'message')
-                    and e.reason.message):
+                if hasattr(e.reason, 'message') and e.reason.message:
                     e_msg = force_decode(": " + e.reason.message)
                     if e_msg is not None:
-                        msg = msg + e_msg
+                        msg += e_msg
                 elif (hasattr(e.reason, 'strerror')
                       and e.reason.strerror):
                     e_msg = force_decode(": " + e.reason.strerror)
                     if e_msg is not None:
-                        msg = msg + e_msg
+                        msg += e_msg
             if self.is_proxy:
                 msg = (msg + "\nPlease check your Internet connection,"
                        + " make sure the Nuxeo server URL is valid"
@@ -1211,7 +1217,7 @@ class BaseAutomationClient(BaseClient):
                 _, _, _, error = log_details
                 if error and error.startswith("Unable to find batch"):
                     raise InvalidBatchException()
-            raise e
+            raise UploadException(str(log_details))
         finally:
             input_file.close()
         # CSPII-9144: help diagnose upload problem
@@ -1423,8 +1429,13 @@ class BaseAutomationClient(BaseClient):
                 message = exc.get('message')
                 stack = exc.get('stack')
                 error = exc.get('error')
+                code = exc.get('code')
                 if message:
                     log.debug('Remote exception message: %s', message)
+                if code:
+                    log.debug('Remote exception code: %s', code)
+                if error:
+                    log.debug('Remote exception error: %s', error)
                 if stack:
                     log.debug('Remote exception stack: %r', exc['stack'], exc_info=True)
                 else:
@@ -1462,25 +1473,31 @@ class BaseAutomationClient(BaseClient):
             # Check if synchronization thread was suspended
             if self.check_suspended is not None:
                 self.check_suspended('File upload: %s' % file_object.name)
-            r = file_object.read(buffer_size)
-            if not r:
-                self.update_upload_transfer_rate(0)
+            try:
+                r = file_object.read(buffer_size)
+            except IOError as (errno, strerror):
+                log.error("I/O error(%d): %s", errno, strerror)
                 break
+            else:
+                if not r:
+                    self.update_upload_transfer_rate(0)
+                    break
 
-            if BaseAutomationClient.use_upload_rate_limit():
-                size = int(math.ceil(len(r) / 1000.0))
-                wait_time = BaseAutomationClient.upload_token_bucket.consume(size)
-                while wait_time > 0:
-                    log.trace('waiting to upload: %s sec [rate=%d]', wait_time,
-                              BaseAutomationClient.upload_token_bucket.get_fill_rate())
-                    time.sleep(wait_time)
-                    wait_time = BaseAutomationClient.upload_token_bucket.consume(size)
-
-            if current_action is not None:
-                current_action.progress += buffer_size
                 if BaseAutomationClient.use_upload_rate_limit():
-                    self.update_upload_transfer_rate(len(r))
-            yield r
+                    size = int(math.ceil(len(r) / 1000.0))
+                    wait_time = BaseAutomationClient.upload_token_bucket.consume(size)
+                    while wait_time > 0:
+                        wait_time = min(wait_time, DM_READ_TIMEOUT - DM_UPLOAD_LATENCY)
+                        log.trace('waiting to upload: %s sec [rate=%d]', wait_time,
+                                  BaseAutomationClient.upload_token_bucket.get_fill_rate())
+                        time.sleep(wait_time)
+                        wait_time = BaseAutomationClient.upload_token_bucket.consume(size)
+
+                if current_action is not None:
+                    current_action.progress += buffer_size
+                    if BaseAutomationClient.use_upload_rate_limit():
+                        self.update_upload_transfer_rate(len(r))
+                yield r
 
     def do_get(self, url, file_out=None, digest=None, digest_algorithm=None):
         log.trace('Downloading file from %r to %r with digest=%s, digest_algorithm=%s', url, file_out, digest,
