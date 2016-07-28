@@ -19,8 +19,6 @@ from nxdrive.client.base_automation_client import DOWNLOAD_TMP_FILE_SUFFIX
 from nxdrive.logging_config import get_logger
 from nxdrive.client.common import safe_filename
 from nxdrive.client.common import NotFound
-from nxdrive.client.common import DEFAULT_IGNORED_PREFIXES
-from nxdrive.client.common import DEFAULT_IGNORED_SUFFIXES
 from nxdrive.utils import normalized_path
 from nxdrive.utils import safe_long_path
 from nxdrive.utils import guess_digest_algorithm
@@ -131,9 +129,6 @@ class FileInfo(object):
         return h.hexdigest()
 
 
-# filters for files to be ignored
-MAX_SIZE = sys.maxint
-
 registry = set()
 
 
@@ -146,7 +141,6 @@ def register(*args, **kwargs):
         func2 = partial(func, *args, **kwargs)
         func2.apply_to_parent = apply_to_parent
         registry.add(func2)
-        print 'added %s to registry' % func
         return func2
     return decorator
 
@@ -165,20 +159,40 @@ class LocalClient(BaseClient):
         # computation if the synchronization thread needs to be suspended
         self.check_suspended = check_suspended
 
+        cls = type(self)
         if ignored_prefixes is not None:
-            self.ignored_prefixes = ignored_prefixes
-        else:
-            self.ignored_prefixes = DEFAULT_IGNORED_PREFIXES
+            # remove default prefixes and register with these new ones
+            fname = cls.ignore_prefixes.func.func_name
+            cls._remove_ignore_filter(fname)
+            # reregister the "ignore_prefixes filter with the new prefixes
+            self._add_ignore_filter(fname, prefixes=ignored_prefixes)
 
         if ignored_suffixes is not None:
-            self.ignored_suffixes = ignored_suffixes
-        else:
-            self.ignored_suffixes = DEFAULT_IGNORED_SUFFIXES
+            # remove default suffixes and register with these new ones
+            fname = cls.ignore_suffixes.func.func_name
+            cls._remove_ignore_filter(fname)
+            # reregister the "ignore_suffixes filter with the new suffixes
+            self._add_ignore_filter(fname, suffixes=ignored_suffixes)
 
         while len(base_folder) > 1 and base_folder.endswith(os.path.sep):
             base_folder = base_folder[:-1]
         self.base_folder = base_folder
         self._digest_func = digest_func
+
+    @staticmethod
+    def _remove_ignore_filter(func_name):
+        partial_func = None
+        for f in registry:
+            if f.func.func_name == func_name:
+                partial_func = f
+                break
+        if partial_func:
+            registry.remove(partial_func)
+
+    def _add_ignore_filter(self, func_name, **kwargs):
+        partial_func = getattr(self, func_name, None)
+        if partial_func:
+            register(**kwargs)(partial_func.func)
 
     @register()
     def ignore_non_existant(self, parent, name, **kwargs):
