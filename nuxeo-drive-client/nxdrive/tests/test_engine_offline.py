@@ -14,9 +14,6 @@ from urllib2 import URLError
 from time import sleep
 from nxdrive.client.base_automation_client import BaseAutomationClient
 
-server_online = True
-original_execute = BaseAutomationClient.execute
-original_fetch_api = BaseAutomationClient.fetch_api
 
 
 class EngineOffLineTestCase(UnitTestCase):
@@ -26,6 +23,10 @@ class EngineOffLineTestCase(UnitTestCase):
     2. Files/folders should not sync while engine is paused due to a network error
     3. Files/folders should not sync on manual pause and should sync on resume.
     '''
+
+    server_online = True
+    original_execute = BaseAutomationClient.execute
+    original_fetch_api = BaseAutomationClient.fetch_api
 
     def setUp(self):
         super(EngineOffLineTestCase, self).setUp()
@@ -37,17 +38,16 @@ class EngineOffLineTestCase(UnitTestCase):
         pass
 
     def mock_fetch_api(self):
-        global server_online
-        if not server_online:
+        if not EngineOffLineTestCase.server_online :
             raise URLError("server is offline in mock_fetch_api:")
-        return original_fetch_api(self)
+        return EngineOffLineTestCase.original_fetch_api(self)
 
     def mock_execute(self, *args, **kwargs):
-        global server_online
-        if not server_online and ('NuxeoDrive' in args[0] or 'Workspace' in args[0] or args[0].strip('/').endswith('/automation')):
+        if not EngineOffLineTestCase.server_online and ('NuxeoDrive' in args[0] or \
+            'Workspace' in args[0] or args[0].strip('/').endswith('/automation')):
             # block all Nuxeo Drive APIs and also UserWorkspace.Get API only when server offline
             raise URLError("server is offline in mock_execute:")
-        return original_execute(self, *args, **kwargs)
+        return EngineOffLineTestCase.original_execute(self, *args, **kwargs)
 
     @patch.object(nxdrive.client.base_automation_client.BaseAutomationClient, 'fetch_api', mock_fetch_api)
     @patch.object(nxdrive.client.base_automation_client.BaseAutomationClient, 'execute', mock_execute)
@@ -62,8 +62,7 @@ class EngineOffLineTestCase(UnitTestCase):
         4. Check the pair_state when engine goes online
         '''
 
-        global server_online
-        server_online = False
+        EngineOffLineTestCase.server_online = False
         # Wait for GetChangeSummary to call check_offline method
         sleep(35)
 
@@ -82,8 +81,7 @@ class EngineOffLineTestCase(UnitTestCase):
         self.assertEqual(test_file.error_count, 0)
 
         # Stop mocking and call original method
-        global server_online
-        server_online = True
+        EngineOffLineTestCase.server_online = True
         # Wait for queue_manager to process for the folder/file
         sleep(60)
 
@@ -123,7 +121,7 @@ class EngineOffLineTestCase(UnitTestCase):
         # Resume the engine
         self.engine_1.resume()
         # Wait for queue_manager to process the folder/file
-        sleep(60)
+        sleep(25) # To avoid failure, if any delay in server response
 
         # pair_state should be 'synchronized' for the folder/file
         test_folder = self.get_dao_state_from_engine_1('/FolderB')

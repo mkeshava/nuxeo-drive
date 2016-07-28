@@ -262,8 +262,7 @@ class LocalWatcher(EngineWorker):
         self._metrics['last_local_scan_time'] = current_milli_time() - start_ms
         log.debug("Full scan finished in %dms", self._metrics['last_local_scan_time'])
         self._local_scan_finished = True
-        if not self._engine.is_offline():
-            self._engine.get_queue_manager().resume()
+        self._engine.get_queue_manager().resume()
         self.localScanFinished.emit()
 
     def _scan_handle_deleted_files(self):
@@ -291,8 +290,7 @@ class LocalWatcher(EngineWorker):
         self._suspend_queue()
         self._scan_recursive(info, recursive=False)
         self._scan_handle_deleted_files()
-        if not self._engine.is_offline():
-            self._engine.get_queue_manager().resume()
+        self._engine.get_queue_manager().resume()
 
     def empty_events(self):
         return self._watchdog_queue.empty() and ( not AbstractOSIntegration.is_windows() or
