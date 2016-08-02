@@ -816,22 +816,27 @@ class LocalClient(BaseClient):
         else:
             suffix = ''
 
+        children = os.listdir(self._abspath(parent))
         for _ in range(limit):
             os_path = self._abspath(os.path.join(parent, name + suffix))
             if old_name == (name + suffix):
                 return os_path, name + suffix
             if not os.path.exists(os_path):
                 return os_path, name + suffix
-            if __disable_duplication:
+            # if the path exists but the child name differs in case, then allow deduplication,
+            # as the server allows multiple docs where name (title) differs in case only, but
+            # the file system does not
+            is_case_match = (name + suffix) in children
+            if __disable_duplication and is_case_match:
                 raise LimitExceededError(None, "De-duplication is disabled")
             # the is a duplicated file, try to come with a new name
             log.trace("dedup: %s exist try next", os_path)
             m = re.match(DEDUPED_BASENAME_PATTERN, name)
             if m:
-                short_name, increment = m.groups()
-                name = u"%s__%d" % (short_name, int(increment) + 1)
+                name, increment = m.groups()
             else:
-                name += u'__1'
+                increment = '0'
+            name = u"%s__%d" % (name, int(increment) + 1)
             log.trace("Deduplicate a name: %s", name, exc_info=True)
 
         name, _ = os.path.splitext(os.path.basename(os_path))
