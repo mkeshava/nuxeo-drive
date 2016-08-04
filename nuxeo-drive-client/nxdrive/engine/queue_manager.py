@@ -143,12 +143,13 @@ class QueueManager(QObject):
                   self._max_local_processors, self._max_remote_processors, self._max_generic_processors)
 
     def resume(self):
-        log.debug("Resuming queue")
-        self.enable_local_file_queue(True, False)
-        self.enable_local_folder_queue(True, False)
-        self.enable_remote_file_queue(True, False)
-        self.enable_remote_folder_queue(True, False)
-        self.queueProcessing.emit()
+        if not self._engine.is_offline():
+            log.debug("Resuming queue")
+            self.enable_local_file_queue(True, False)
+            self.enable_local_folder_queue(True, False)
+            self.enable_remote_file_queue(True, False)
+            self.enable_remote_folder_queue(True, False)
+            self.queueProcessing.emit()
 
     def is_paused(self):
         return (not self._local_file_enable or
