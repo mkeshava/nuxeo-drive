@@ -12,6 +12,8 @@ import urllib2
 USERNAME_UPDATE_INTERVAL = timedelta(days=1).total_seconds()
 log = get_logger(__name__)
 
+ENABLE_RESOLUTION = True
+
 
 class UserNameResolver(PollWorker):
     '''
@@ -30,6 +32,8 @@ class UserNameResolver(PollWorker):
             Refresh first name and last name of all users
         '''
         log.trace("Refreshing Users table")
+        if not ENABLE_RESOLUTION:
+            return
         try:
             # This method will retrieve the first 50 users for the current tenant (includes guest users also). This is re-using API meant for user search in DM UI
             self.fetch_all_users()
