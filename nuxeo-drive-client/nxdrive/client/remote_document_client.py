@@ -6,7 +6,6 @@ from datetime import datetime
 import os
 import urllib2
 from nxdrive.client.common import DEFAULT_REPOSITORY_NAME
-from nxdrive.client.common import base_is_ignored
 from nxdrive.client.common import safe_filename
 from nxdrive.logging_config import get_logger
 from nxdrive.client.common import NotFound
@@ -311,13 +310,30 @@ class RemoteDocumentClient(BaseAutomationClient):
             doc['path'], folderish, last_update, lastContributor,
             digestAlgorithm, digest, self.repository, doc['type'], version, doc['state'], has_blob, filename)
 
-    def _filtered_results(self, entries, fetch_parent_uid=True, parent_uid=None):
-        infos = [self._doc_to_info(d, fetch_parent_uid=fetch_parent_uid, parent_uid=parent_uid) for d in entries]
+    def _filtered_results(self, entries, fetch_parent_uid=True,
+                          parent_uid=None):
         # Filter out filenames that would be ignored by the file system client
-        # so as to be consistent
-        # TODO use the parent path (instead of None) to also filter by the parent directory name, e.g.
-        # ignore files in a hidden folder
-        return [info for info in infos if not base_is_ignored(None, None, info.name)]
+        # so as to be consistent.
+        filtered = []
+        for info in [self._doc_to_info(d, fetch_parent_uid=fetch_parent_uid,
+                                       parent_uid=parent_uid)
+                     for d in entries]:
+            ignore = False
+
+            for suffix in self.ignored_suffixes:
+                if info.name.endswith(suffix):
+                    ignore = True
+                    break
+
+            for prefix in self.ignored_prefixes:
+                if info.name.startswith(prefix):
+                    ignore = True
+                    break
+
+            if not ignore:
+                filtered.append(info)
+
+        return filtered
 
     #
     # Generic Automation features reused from nuxeolib
