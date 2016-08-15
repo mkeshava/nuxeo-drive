@@ -162,17 +162,6 @@ class LocalClient(BaseClient):
         self._digest_func = digest_func
 
     @register()
-    def ignore_non_existant(self, parent, name, **kwargs):
-        # 'self' here represents the context where the function is called and is used to facilitate its work; use
-        # 'duck-typing' to check for the right context.
-        # skip if called with a context which cannot compute the absolute path, e.g. missing,
-        # not derived from LocalClient, etc.
-        if self is None or not hasattr(self, '_abspath'):
-            return False
-        path = self._abspath(os.path.join(parent, name))
-        return not os.path.exists(path)
-
-    @register()
     def ignore_guest_folder(self, parent, name, **kwargs):
         # 'self' here represents the context where the function is called and is used to facilitate its work; use
         # 'duck-typing' to check for the right context.
