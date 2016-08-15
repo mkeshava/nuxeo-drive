@@ -12,6 +12,8 @@ import urllib2
 USERNAME_UPDATE_INTERVAL = timedelta(days=1).total_seconds()
 log = get_logger(__name__)
 
+ENABLE_RESOLUTION = True
+
 
 class UserNameResolver(PollWorker):
     '''
@@ -30,11 +32,10 @@ class UserNameResolver(PollWorker):
             Refresh first name and last name of all users
         '''
         log.trace("Refreshing Users table")
+        if not ENABLE_RESOLUTION:
+            return
         try:
-            # This method will retrieve the first 50 users for the current tenant (includes guest users also). This is re-using API meant for user search in DM UI
-            self.fetch_all_users()
-            # For remaining users we userid to user full name resolution done by 'api/v1/user/<userid>'
-            # while True:
+            # Convert userid to user full name resolution done by 'api/v1/user/<userid>'
             to_refresh = self._engine._dao.get_next_users_to_resolve()
             for user in to_refresh:
                 self.get_user_full_name(user.user_id)
@@ -82,17 +83,3 @@ class UserNameResolver(PollWorker):
         except urllib2.URLError as e:
             log.exception(e)
         return self._engine._dao.get_user_info(user_id)
-
-    def fetch_all_users(self):
-        '''
-            Retrieve the userid - user name mapping of users in the current tenant
-        '''
-        try:
-            remote_doc_client = self._engine.get_remote_doc_client()
-            all_users = remote_doc_client.get_all_users()
-            for user in all_users:
-                if 'username' in user and 'firstName' in user and 'lastName' in user:
-                    self._engine._dao.insert_update_user_info(user["username"], user['firstName'], user['lastName'])
-        except Exception as e:
-            log.exception(e)
-        return

@@ -21,6 +21,7 @@ from PyQt4 import QtCore
 from functools import wraps
 from threading import Thread
 from time import sleep
+from nxdrive.engine import username_resolver
 
 if 'DRIVE_YAPPI' in os.environ:
     import yappi
@@ -251,6 +252,8 @@ class UnitTestCase(unittest.TestCase):
         options.autolock_interval = 30
         options.nxdrive_home = self.nxdrive_conf_folder_1
         options.version == __version__
+        options.upload_rate = 300
+        options.download_rate = 300
         self.manager_1 = Manager(options)
         self.connected = False
         self.version = self.manager_1.get_version()
@@ -268,6 +271,7 @@ class UnitTestCase(unittest.TestCase):
             self.nuxeo_url = url.split('#')[0]
         self.setUpServer(server_profile)
 
+        nxdrive.engine.username_resolver.ENABLE_RESOLUTION = False
         self.engine_1 = self.manager_1.bind_server(self.local_nxdrive_folder_1, url, self.user_1,
                                                    self.password_1, start_engine=False)
         self.engine_2 = self.manager_2.bind_server(self.local_nxdrive_folder_2, url, self.user_2,
