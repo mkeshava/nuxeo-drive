@@ -111,11 +111,12 @@ def ignore_prefix_and_suffix(client, parent, name, **kwargs):
 
 def base_is_ignored(client, parent_ref, file_name):
     ignore_parent = False
+    registry2 = registry.copy()
     if parent_ref:
         grandparent_ref, dir_name = os.path.split(parent_ref)
         if dir_name:
-            ignore_parent = any(f(client, grandparent_ref, dir_name) for f in registry if f.apply_to_parent)
-    return ignore_parent or any(f(client, parent_ref, file_name) for f in registry)
+            ignore_parent = any(f(client, grandparent_ref, dir_name) for f in registry2 if f.apply_to_parent)
+    return ignore_parent or any(f(client, parent_ref, file_name) for f in registry2)
 
 
 class BaseClient(object):
