@@ -530,11 +530,13 @@ class LocalClient(BaseClient):
 
     def manipulate_guest_filter(self, ignore_guest):
         if ignore_guest:
-            remove_ignore_filter("ignore_guest_folder")
-        else:
+            # add "guest folder" filter so it is ignored
             func = getattr(self, "ignore_guest_folder", None)
             if func:
                 add_ignore_filter(func)
+        else:
+            # remove "guest folder" filter so it is not ignored
+            remove_ignore_filter("ignore_guest_folder")
 
     def is_ignored(self, parent_ref, file_name, ignore_guest=False):
         self.manipulate_guest_filter(ignore_guest)
