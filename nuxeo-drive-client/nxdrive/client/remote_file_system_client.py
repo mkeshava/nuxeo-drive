@@ -149,8 +149,8 @@ class RemoteFileSystemClient(BaseAutomationClient):
     def stream_file(self, parent_id, file_path, filename=None, mime_type=None):
         """Create a document by streaming the file with the given path"""
         fs_item = self.execute_with_blob_streaming("NuxeoDrive.CreateFile",
-            file_path, filename=filename, mime_type=mime_type,
-            parentId=parent_id)
+                                                   file_path, filename=filename, mime_type=mime_type,
+                                                   parentId=parent_id)
         return self.file_to_info(fs_item)
 
     def update_content(self, fs_item_id, content, filename=None,
