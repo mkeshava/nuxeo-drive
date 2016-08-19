@@ -1218,11 +1218,12 @@ class BaseAutomationClient(BaseClient):
         except URLError as e:
             raise UploadException(str(e))
         except Exception as e:
-            log_details = self._log_details(e)
+            log_details = self._log_details(e) or e
+            log.trace("[BaseAutomationClient.upload] %s exception: %s", type(e).__name__, str(log_details))
             if isinstance(log_details, tuple):
                 _, _, _, error = log_details
                 if error and error.startswith("Unable to find batch"):
-                    raise InvalidBatchException()
+                    raise InvalidBatchException(error)
             raise UploadException(str(log_details))
         finally:
             input_file.close()
@@ -1236,7 +1237,7 @@ class BaseAutomationClient(BaseClient):
 
     def execute_batch(self, op_id, batch_id, file_idx, tx_timeout, **params):
         """Execute a file upload Automation batch"""
-        extra_headers = {'Nuxeo-Transaction-Timeout': tx_timeout,}
+        extra_headers = {'Nuxeo-Transaction-Timeout': tx_timeout, }
         if self.is_new_upload_api_available():
             url = (self.rest_api_url + self.batch_upload_path + '/' + batch_id + '/' + file_idx
                    + '/execute/' + op_id)
@@ -1427,15 +1428,20 @@ class BaseAutomationClient(BaseClient):
                       response.code, response.msg, url, cookies, content_type)
             return s
 
-    def _log_details(self, e):
+    @staticmethod
+    def _log_details(e):
+        # CSPII-9144: help diagnose upload problem
+        log.trace('in _log_details, %s exception: %s', type(e).__name__, repr(e))
         if hasattr(e, "fp"):
             detail = e.fp.read()
+            log.error("in _log_details, exception detail: %s", repr(detail) if detail else 'none')
             try:
                 exc = json.loads(detail)
                 message = exc.get('message')
                 stack = exc.get('stack')
                 error = exc.get('error')
                 code = exc.get('code')
+                status = exc.get('status')
                 if message:
                     log.debug('Remote exception message: %s', message)
                 if code:
@@ -1446,7 +1452,7 @@ class BaseAutomationClient(BaseClient):
                     log.debug('Remote exception stack: %r', exc['stack'], exc_info=True)
                 else:
                     log.debug('Remote exception details: %r', detail)
-                return exc.get('status'), exc.get('code'), message, error
+                return status, code, message, error
             except:
                 # Error message should always be a JSON message,
                 # but sometimes it's not
@@ -1456,12 +1462,10 @@ class BaseAutomationClient(BaseClient):
                     message = detail
                 log.error(message)
                 if isinstance(e, urllib2.HTTPError):
-                    return e.code, None, message, None
-        # CSPII-9144: help diagnose upload problem
-        log.trace('Client exception: %s', e.message)
-        return None
+                    return None, e.code, message, None
 
-    def _generate_unique_id(self):
+    @staticmethod
+    def _generate_unique_id():
         """Generate a unique id based on a timestamp and a random integer"""
 
         return str(time.time()) + '_' + str(random.randint(0, 1000000000))
