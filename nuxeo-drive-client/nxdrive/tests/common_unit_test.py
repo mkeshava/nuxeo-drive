@@ -255,7 +255,6 @@ class UnitTestCase(unittest.TestCase):
         options.upload_rate = 300
         options.download_rate = 300
         self.manager_1 = Manager(options)
-        self.connected = False
         self.version = self.manager_1.get_version()
         import nxdrive
         nxdrive_path = os.path.dirname(nxdrive.__file__)
@@ -367,19 +366,17 @@ class UnitTestCase(unittest.TestCase):
         }
         self._no_remote_changes = {self.engine_1.get_uid(): not wait_for_engine_1,
                                    self.engine_2.get_uid(): not wait_for_engine_2}
-        if enforce_errors:
-            if not self.connected:
-                self.engine_1.syncPartialCompleted.connect(self.engine_1.get_queue_manager().requeue_errors)
-                self.engine_2.syncPartialCompleted.connect(self.engine_1.get_queue_manager().requeue_errors)
-                self.connected = True
-        elif self.connected:
-            self.engine_1.syncPartialCompleted.disconnect(self.engine_1.get_queue_manager().requeue_errors)
-            self.engine_2.syncPartialCompleted.disconnect(self.engine_1.get_queue_manager().requeue_errors)
-            self.connected = False
+
+        self._connect_partial_complete(enforce_errors=enforce_errors,
+                                       wait_for_engine_1=wait_for_engine_1, wait_for_engine_2=wait_for_engine_2)
+
         while timeout > 0:
             sleep(1)
-            timeout = timeout - 1
+            timeout -= 1
             if sum(self._wait_sync.values()) == 0:
+                self._disconnect_partial_complete(enforce_errors=enforce_errors,
+                                                  wait_for_engine_1=wait_for_engine_1,
+                                                  wait_for_engine_2=wait_for_engine_2)
                 if wait_for_async:
                     log.debug('Sync completed, _wait_remote_scan = %r, remote changes count = %r,'
                               ' no remote changes = %r',
@@ -399,17 +396,20 @@ class UnitTestCase(unittest.TestCase):
                                              and self._remote_changes_count[self.engine_2.get_uid()] > 0)
                         is_change_summary_over = (is_change_summary_over
                                                   and self._no_remote_changes[self.engine_2.get_uid()])
-                    if (not wait_remote_scan or is_remote_changes and is_change_summary_over):
+                    if not wait_remote_scan or is_remote_changes and is_change_summary_over:
                         self._wait_remote_scan = {self.engine_1.get_uid(): wait_for_engine_1,
                                                   self.engine_2.get_uid(): wait_for_engine_2}
                         self._remote_changes_count = {self.engine_1.get_uid(): 0, self.engine_2.get_uid(): 0}
                         self._no_remote_changes = {self.engine_1.get_uid(): False, self.engine_2.get_uid(): False}
                         log.debug('Ended wait for sync, setting _wait_remote_scan values to True,'
                                   ' _remote_changes_count values to 0 and _no_remote_changes values to False')
-                        return
                 else:
                     log.debug("Sync completed, ended wait for sync")
-                    return
+                return
+        else:
+            self._disconnect_partial_complete(enforce_errors=enforce_errors,
+                                              wait_for_engine_1=wait_for_engine_1,
+                                              wait_for_engine_2=wait_for_engine_2)
         if fail_if_timeout:
             log.warn("Wait for sync timeout has expired")
             if wait_for_engine_1 and self.engine_1.get_dao().get_syncing_count() != 0:
@@ -418,6 +418,30 @@ class UnitTestCase(unittest.TestCase):
                 self.fail("Wait for sync timeout expired")
         else:
             log.debug("Wait for sync timeout")
+
+    def _connect_partial_complete(self, enforce_errors=True, wait_for_engine_1=True, wait_for_engine_2=False):
+        if enforce_errors:
+            if wait_for_engine_1:
+                self.engine_1.syncPartialCompleted.connect(self.engine_1.get_queue_manager().requeue_errors)
+            if wait_for_engine_2:
+                self.engine_2.syncPartialCompleted.connect(self.engine_1.get_queue_manager().requeue_errors)
+        else:
+            if wait_for_engine_1:
+                self.engine_1.syncPartialCompleted.connect(self.app.sync_completed)
+            if wait_for_engine_2:
+                self.engine_2.syncPartialCompleted.connect(self.app.sync_completed)
+
+    def _disconnect_partial_complete(self, enforce_errors=True, wait_for_engine_1=True, wait_for_engine_2=False):
+        if enforce_errors:
+            if wait_for_engine_1:
+                self.engine_1.syncPartialCompleted.disconnect(self.engine_1.get_queue_manager().requeue_errors)
+            if wait_for_engine_2:
+                self.engine_2.syncPartialCompleted.disconnect(self.engine_1.get_queue_manager().requeue_errors)
+        else:
+            if wait_for_engine_1:
+                self.engine_1.syncPartialCompleted.disconnect(self.app.sync_completed)
+            if wait_for_engine_2:
+                self.engine_2.syncPartialCompleted.disconnect(self.app.sync_completed)
 
     def wait_remote_scan(self, timeout=DEFAULT_WAIT_REMOTE_SCAN_TIMEOUT, wait_for_engine_1=True,
                          wait_for_engine_2=False):
