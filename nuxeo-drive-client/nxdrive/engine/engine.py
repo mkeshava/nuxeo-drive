@@ -901,14 +901,15 @@ class Engine(QObject):
 
     def suspend_client(self, reason):
         if self.is_paused() or self._stopped:
-            raise ThreadInterrupt
+            raise ThreadInterrupt("[Engine.suspend_client] client paused or stopped: %s" % repr(reason))
         # Verify thread status
         thread_id = current_thread().ident
         for thread in self._threads:
             if hasattr(thread, "worker") and isinstance(thread.worker, Processor):
                 if (thread.worker._thread_id == thread_id and
                         thread.worker._continue == False):
-                    raise ThreadInterrupt
+                    raise ThreadInterrupt("[Engine.suspend_client] Worker thread %s _continue flag is False: %s" %
+                                          (thread_id, repr(reason)))
         # Get action
         current_file = None
         action = Action.get_current_action()

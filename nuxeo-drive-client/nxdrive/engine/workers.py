@@ -97,7 +97,7 @@ class Worker(QObject):
             sleep(0.01)
         # Handle thread interruption
         if not self._continue:
-            raise ThreadInterrupt()
+            raise ThreadInterrupt("[Worker._interact] process app events - _continue flag is False")
 
     def _execute(self):
         while (1):

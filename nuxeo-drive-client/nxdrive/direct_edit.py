@@ -88,7 +88,7 @@ class DirectEdit(Worker):
 
     def stop_client(self, reason):
         if self._stop:
-            raise ThreadInterrupt
+            raise ThreadInterrupt("[DirectEdit.stop_client] worker stopped: %s" % repr(reason))
 
     def handle_url(self, url=None):
         if url is None:
