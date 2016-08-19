@@ -312,7 +312,7 @@ class QueueManager(QObject):
 
     def requeue_errors(self):
         for doc_pair in self._on_error_queue.items():
-            doc_pair.error_next_try = 0
+            doc_pair.error_count = 1
 
     def _get_local_folder(self):
         if self._local_folder_queue.empty():
