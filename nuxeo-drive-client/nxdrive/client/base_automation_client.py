@@ -30,6 +30,7 @@ import socket
 import threading
 import math
 from collections import defaultdict
+from nxdrive.engine.workers import ThreadInterrupt
 
 
 log = None
@@ -1217,6 +1218,10 @@ class BaseAutomationClient(BaseClient):
             log.trace('KeyError exception: %s', sys.exc_traceback.tb_lineno)
         except URLError as e:
             raise UploadException(str(e))
+        except ThreadInterrupt as e:
+            # The ThreadInterrupt Exception should be propagated as it is to be handled by Processor._execute method
+            # This can happen during upload for multiple reasons (Application pause, exit, local folder scan, etc).
+            raise
         except Exception as e:
             log_details = self._log_details(e) or e
             log.trace("[BaseAutomationClient.upload] %s exception: %s", type(e).__name__, str(log_details))
